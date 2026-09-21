@@ -550,7 +550,7 @@ namespace trutility
 
         private void OnAbout(object sender, EventArgs e)
         {
-            using (var dlg = new AboutDialog(GlobalRoot, UserRoot))
+            using (AboutDialog dlg = new AboutDialog(RootsLib.GetGlobalRoots(), RootsLib.GetUserRoot()))
             {
                 dlg.ShowDialog();
                 // The rebuild creates the folder and re-points the watchers.
@@ -731,175 +731,393 @@ namespace trutility
     {
         public bool UserRootChanged { get; private set; }
 
-        private readonly string _globalRoot;
+        private const string StatusChecking = "Checking…";
+        private const int StatusColumn = 4;
+
+        private readonly IReadOnlyList<Root> _globalRoots;
         private string _userRoot;
 
         /// True when Change… picked a path, false when Reset asked to fall back.
         /// Only meaningful while UserRootChanged is set.
         private bool _userRootExplicitlyChosen;
         private Label _userRootLabel;
+        private ListView _rootsList;
+        private Button _btnOpenSelected;
         private CheckBox _chkShell;
         private CheckBox _chkStartup;
         private CheckBox _chkTrayPin;
 
-        public AboutDialog(string globalRoot, string userRoot)
+        public AboutDialog(IReadOnlyList<Root> globalRoots, Root userRoot)
         {
-            _globalRoot = globalRoot;
-            _userRoot = userRoot;
-
-            var ver = Assembly.GetExecutingAssembly().GetName().Version;
+            _globalRoots = globalRoots ?? new Root[0];
+            _userRoot = userRoot == null ? RootsLib.ResolveUserRootPath() : userRoot.Path;
 
             Text = "About trutility";
-            FormBorderStyle = FormBorderStyle.FixedDialog;
+            FormBorderStyle = FormBorderStyle.Sizable;
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(520, 550);
+            ClientSize = new Size(780, 700);
+            MinimumSize = new Size(640, 520);
 
-            // ── Info label ────────────────────────────────────────────────────
-            var lbl = new Label
+            // A single column that grows with the window. The folder list is the
+            // only row given the slack, because it is the one whose length is
+            // decided by policy rather than by this layout.
+            TableLayoutPanel layout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 6,
+                Padding = new Padding(12),
+            };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+
+            Control[] rows =
+            {
+                BuildHeader(),
+                BuildGlobalGroup(),
+                BuildUserGroup(),
+                BuildSettingsGroup(),
+                BuildHelpGroup(),
+                BuildButtonRow(),
+            };
+
+            foreach (Control row in rows)
+            {
+                row.Dock = DockStyle.Fill;
+                row.Margin = new Padding(0, 0, 0, 10);
+                layout.RowStyles.Add(row == rows[1]
+                    ? new RowStyle(SizeType.Percent, 100f)
+                    : new RowStyle(SizeType.AutoSize));
+                layout.Controls.Add(row);
+            }
+
+            Controls.Add(layout);
+            ProbeRootStatusesAsync();
+        }
+
+        // ── Sections ──────────────────────────────────────────────────────────
+
+        private static Control BuildHeader()
+        {
+            Version ver = Assembly.GetExecutingAssembly().GetName().Version;
+            return new Label
             {
                 Text =
-                    $"trutility - Tray Utility v{ver.Major}.{ver.Minor}.{ver.Build}\n\n" +
-                    $"Keep your favorite files, tools or folders within reach.\n\n" +
-                    $"Author: Vladimirs Kuznecovs\n" +
-                    $"Email: vladimir.kuznetsov0706@gmail.com\n" +
-                    $"GitHub: https://github.com/vkuz-dev/trutility\n\n" +
-
-                    $"=======================================\n\n" +
-
-                    $"Put your tools into these locations:\n" +
-                    $"  Global tools(visible for everyone): {globalRoot}\n" +
-                    $"  User tools(visible only to you): {userRoot}\n\n" +
-                    $"Menu Organization:\n" +
-                    $"Append these suffixes to a filename to insert line separators:\n" +
-                    $"  `$^`   -  adds separator ABOVE\n" +
-                    $"  `$_`   -  adds separator BELOW\n" +
-                    $"  `$^_`  -  adds separator on BOTH SIDES\n" +
-                    $"  `$F`   -  follows the shortcut and expands it into a submenu\n" +
-                    $"  Example: \"trutility$^_.exe\" - separators on BOTH sides\n\n" +
-                    $"Mouse shortcuts (on any tray menu item):\n" +
-                    $"  Ctrl  + Click  - remove item from User folder (sent to Recycle Bin)\n" +
-                    $"  Shift + Click - run as Administrator\n\n",
-                AutoSize = false,
-                Size = new Size(520, 310),
-                Location = new Point(10, 10),
-            };
-
-            // ── Settings checkboxes (grouped) ─────────────────────────────────
-            var grpSettings = new GroupBox
-            {
-                Text = "Settings",
-                Size = new Size(500, 100),
-                Location = new Point(10, 320),
-            };
-
-            bool shellManaged = TrayApplication.IsShellVerbManagedByPolicy();
-            _chkShell = new CheckBox
-            {
-                Text = shellManaged
-                               ? "Enable \"Add to trutility\" in Explorer context menu [Managed by Administrator]"
-                               : "Enable \"Add to trutility\" in Explorer context menu",
+                    $"trutility — Tray Utility v{ver.Major}.{ver.Minor}.{ver.Build}\n" +
+                    "Keep your favourite files, tools or folders within reach.\n\n" +
+                    "Author: Vladimirs Kuznecovs   ·   " +
+                    "GitHub: https://github.com/vkuz-dev/trutility",
                 AutoSize = true,
-                Location = new Point(10, 20),
-                Checked = TrayApplication.IsShellVerbEnabled(),
-                Enabled = !shellManaged,
+            };
+        }
+
+        /// <summary>
+        /// Lists the folders an administrator assigned, with where each one came
+        /// from and whether it resolved.
+        ///
+        /// This is the support surface: "why do I see this" and "why is my
+        /// department folder missing" are both answerable from a screenshot of
+        /// this list, without a remote session.
+        /// </summary>
+        private Control BuildGlobalGroup()
+        {
+            GroupBox group = new GroupBox
+            {
+                Text = "Global folders — managed by your administrator (read-only)",
+                Padding = new Padding(10, 6, 10, 10),
+                // The one section whose length policy decides, so it keeps a
+                // usable minimum however many roots arrive.
+                MinimumSize = new Size(0, 190),
             };
 
-            bool globalStartup = SettingsStartup.IsGlobalStartupEnabled();
-            _chkStartup = new CheckBox
+            _rootsList = new ListView
             {
-                Text = globalStartup
-                               ? "Run at startup [Managed by Administrator]"
-                               : "Run at startup",
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                MultiSelect = false,
+                HideSelection = false,
+                UseCompatibleStateImageBehavior = false,
+            };
+            _rootsList.Columns.Add("Name", 100);
+            _rootsList.Columns.Add("Shown as", 100);
+            _rootsList.Columns.Add("Location", 210);
+            _rootsList.Columns.Add("Configured in", 210);
+            _rootsList.Columns.Add("Status", 90);
+
+            foreach (Root root in _globalRoots)
+            {
+                ListViewItem item = new ListViewItem(new[]
+                {
+                    root.Name,
+                    string.IsNullOrWhiteSpace(root.Label) ? "(top level)" : root.Label,
+                    root.Path,
+                    root.Source ?? "",
+                    StatusChecking,
+                })
+                { Tag = root.Path };
+                _rootsList.Items.Add(item);
+            }
+
+            _rootsList.SelectedIndexChanged += (s, e) =>
+                _btnOpenSelected.Enabled = _rootsList.SelectedItems.Count > 0;
+            _rootsList.DoubleClick += (s, e) => OpenSelectedRoot();
+
+            _btnOpenSelected = new Button
+            {
+                Text = "Open selected folder",
                 AutoSize = true,
-                Location = new Point(10, 44),
-                Checked = SettingsStartup.IsStartupEnabled(),
-                Enabled = !globalStartup,
+                Enabled = false,
+                Anchor = AnchorStyles.Left,
+                Margin = new Padding(0, 6, 0, 0),
             };
+            _btnOpenSelected.Click += (s, e) => OpenSelectedRoot();
 
-            bool trayPinManaged = SettingsTrayPin.IsManagedByPolicy();
-            _chkTrayPin = new CheckBox
+            // A table rather than Fill-over-Bottom docking: docking order inside
+            // a GroupBox let the button overlap the last row of the list.
+            TableLayoutPanel inner = new TableLayoutPanel
             {
-                Text = trayPinManaged
-                               ? "Pin icon to tray [Managed by Administrator]"
-                               : "Pin icon to tray",
-                AutoSize = true,
-                Location = new Point(10, 68),
-                Checked = SettingsTrayPin.IsPinEnabled(),
-                Enabled = !trayPinManaged,
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 2,
             };
+            inner.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            inner.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+            inner.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+            inner.Controls.Add(_rootsList, 0, 0);
+            inner.Controls.Add(_btnOpenSelected, 0, 1);
 
-            grpSettings.Controls.AddRange(new Control[] { _chkShell, _chkStartup, _chkTrayPin });
+            group.Controls.Add(inner);
+            return group;
+        }
 
-            // ── User folder location ──────────────────────────────────────────
-            bool userRootManaged = TrayApplication.IsUserRootManagedByPolicy();
-            var grpUser = new GroupBox
+        private Control BuildUserGroup()
+        {
+            bool managed = TrayApplication.IsUserRootManagedByPolicy();
+            GroupBox group = new GroupBox
             {
-                Text = userRootManaged
-                               ? "User folder location [Managed by Administrator]"
-                               : "User folder location",
-                Size = new Size(500, 80),
-                Location = new Point(10, 420),
+                // Policy may decide where this folder lives. What goes in it is
+                // the user's alone, so nothing here is ever disabled by content.
+                Text = managed
+                    ? "Your folder — location set by your administrator"
+                    : "Your folder",
+                Height = 86,
+                Padding = new Padding(10, 6, 10, 10),
             };
 
             _userRootLabel = new Label
             {
                 Text = _userRoot,
-                AutoSize = false,
-                Size = new Size(480, 20),
-                Location = new Point(10, 20),
+                Dock = DockStyle.Top,
+                Height = 20,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Font = new Font("Consolas", 8f),
+                AutoEllipsis = true,
             };
 
-            var btnChange = new Button
+            FlowLayoutPanel buttons = new FlowLayoutPanel
             {
-                Text = "Change…",
-                Size = new Size(80, 24),
-                Location = new Point(10, 48),
-                Enabled = !userRootManaged,
+                Dock = DockStyle.Bottom,
+                Height = 32,
+                FlowDirection = FlowDirection.LeftToRight,
             };
-            btnChange.Click += OnChangeUserRoot;
 
-            var btnReset = new Button
+            Button change = new Button { Text = "Change…", AutoSize = true, Enabled = !managed };
+            change.Click += OnChangeUserRoot;
+
+            Button reset = new Button { Text = "Reset", AutoSize = true, Enabled = !managed };
+            reset.Click += OnResetUserRoot;
+
+            Button open = new Button { Text = "Open", AutoSize = true };
+            open.Click += (s, e) => OpenFolder(_userRoot, createIfMissing: true);
+
+            buttons.Controls.AddRange(new Control[] { change, reset, open });
+            group.Controls.Add(_userRootLabel);
+            group.Controls.Add(buttons);
+            return group;
+        }
+
+        private Control BuildSettingsGroup()
+        {
+            GroupBox group = new GroupBox
             {
-                Text = "Reset",
-                Size = new Size(60, 24),
-                Location = new Point(96, 48),
-                Enabled = !userRootManaged,
+                Text = "Settings",
+                Height = 112,
+                Padding = new Padding(10, 6, 10, 6),
             };
-            btnReset.Click += OnResetUserRoot;
 
-            grpUser.Controls.AddRange(new Control[] { _userRootLabel, btnChange, btnReset });
+            bool shellManaged = TrayApplication.IsShellVerbManagedByPolicy();
+            _chkShell = NewSetting(
+                "Enable \"Add to trutility\" in Explorer context menu",
+                TrayApplication.IsShellVerbEnabled(), shellManaged);
 
-            // ── Bottom buttons ────────────────────────────────────────────────
-            var btnGlobal = new Button
+            bool globalStartup = SettingsStartup.IsGlobalStartupEnabled();
+            _chkStartup = NewSetting(
+                "Run at startup", SettingsStartup.IsStartupEnabled(), globalStartup);
+
+            bool trayPinManaged = SettingsTrayPin.IsManagedByPolicy();
+            _chkTrayPin = NewSetting(
+                "Pin icon to tray", SettingsTrayPin.IsPinEnabled(), trayPinManaged);
+
+            FlowLayoutPanel stack = new FlowLayoutPanel
             {
-                Text = "Open Global folder",
-                Size = new Size(140, 28),
-                Location = new Point(10, 510),
+                Dock = DockStyle.Fill,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
             };
-            btnGlobal.Click += (s, e) => OpenFolder(_globalRoot);
+            stack.Controls.AddRange(new Control[] { _chkShell, _chkStartup, _chkTrayPin });
+            group.Controls.Add(stack);
+            return group;
+        }
 
-            var btnUser = new Button
+        private static CheckBox NewSetting(string text, bool value, bool managed)
+        {
+            return new CheckBox
             {
-                Text = "Open User folder",
-                Size = new Size(130, 28),
-                Location = new Point(158, 510),
+                Text = managed ? text + "   [Managed by Administrator]" : text,
+                AutoSize = true,
+                Checked = value,
+                Enabled = !managed,
             };
-            btnUser.Click += (s, e) => OpenFolder(_userRoot);
+        }
 
-            var btnOk = new Button
+        private static Control BuildHelpGroup()
+        {
+            GroupBox group = new GroupBox
             {
-                Text = "OK",
-                Size = new Size(70, 28),
-                Location = new Point(440, 510),
+                Text = "Menu organization",
+                Height = 104,
+                Padding = new Padding(10, 6, 10, 6),
             };
-            btnOk.Click += OnOkClick;
 
-            AcceptButton = btnOk;
-            Controls.AddRange(new Control[] { lbl, grpSettings, grpUser, btnGlobal, btnUser, btnOk });
+            group.Controls.Add(new Label
+            {
+                Dock = DockStyle.Fill,
+                Text =
+                    "Global folders appear first, one block each, then your own below the " +
+                    "thicker line.\nNothing merges: a Tools folder in two places stays two " +
+                    "separate entries.\n\n" +
+                    "Append to a filename:     " +
+                    "$^  separator above     $_  separator below     " +
+                    "$^_  both sides     $F  expand shortcut as a submenu\n" +
+                    "On any menu item:         " +
+                    "Ctrl + Click  remove from your folder (Recycle Bin)     " +
+                    "Shift + Click  run as Administrator",
+            });
+            return group;
+        }
+
+        private Control BuildButtonRow()
+        {
+            FlowLayoutPanel row = new FlowLayoutPanel
+            {
+                Height = 34,
+                FlowDirection = FlowDirection.RightToLeft,
+            };
+
+            Button ok = new Button { Text = "OK", AutoSize = true, MinimumSize = new Size(80, 26) };
+            ok.Click += OnOkClick;
+
+            Button cancel = new Button
+            {
+                Text = "Cancel",
+                AutoSize = true,
+                MinimumSize = new Size(80, 26),
+                DialogResult = DialogResult.Cancel,
+            };
+
+            row.Controls.AddRange(new Control[] { ok, cancel });
+            AcceptButton = ok;
+            CancelButton = cancel;
+            return row;
+        }
+
+        // ── Root status ───────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Probes the folders off the UI thread, one task each.
+        ///
+        /// A root on a share that is down blocks for the length of an SMB
+        /// timeout, so probing inline would hang the dialog on open and probing
+        /// them in sequence would leave every healthy folder reading "Checking…"
+        /// behind the one dead share. Each row settles on its own.
+        /// </summary>
+        private void ProbeRootStatusesAsync()
+        {
+            for (int i = 0; i < _globalRoots.Count; i++)
+            {
+                int index = i;
+                string path = _globalRoots[i].Path;
+                Task.Run(() => ReportStatus(index, DescribeStatus(path)));
+            }
+        }
+
+        private void ReportStatus(int index, string status)
+        {
+            try
+            {
+                if (IsDisposed || !IsHandleCreated)
+                {
+                    return;
+                }
+
+                BeginInvoke((Action)(() =>
+                {
+                    if (index < _rootsList.Items.Count)
+                    {
+                        _rootsList.Items[index].SubItems[StatusColumn].Text = status;
+                    }
+                }));
+            }
+            catch (Exception ex)
+            {
+                // The dialog was closed while the probe was still running.
+                Diag.Swallowed("reporting folder status", ex);
+            }
+        }
+
+        /// <summary>
+        /// "Empty" is called out separately from "OK" on purpose: a reachable
+        /// folder with nothing in it contributes no menu entries, which is the
+        /// usual answer to a department folder that appears to be missing.
+        /// </summary>
+        private static string DescribeStatus(string path)
+        {
+            try
+            {
+                if (!Directory.Exists(path))
+                {
+                    return "Unreachable";
+                }
+
+                using (IEnumerator<string> entries =
+                       Directory.EnumerateFileSystemEntries(path).GetEnumerator())
+                {
+                    return entries.MoveNext() ? "OK" : "Empty";
+                }
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return "Access denied";
+            }
+            catch (Exception ex)
+            {
+                Diag.Swallowed("checking " + path, ex);
+                return "Error";
+            }
+        }
+
+        private void OpenSelectedRoot()
+        {
+            if (_rootsList.SelectedItems.Count == 0)
+            {
+                return;
+            }
+
+            // Never created on demand: these belong to the administrator, and an
+            // empty folder conjured here would mask a mistyped policy path.
+            OpenFolder(_rootsList.SelectedItems[0].Tag as string, createIfMissing: false);
         }
 
         private void OnOkClick(object sender, EventArgs e)
@@ -961,14 +1179,27 @@ namespace trutility
             UserRootChanged = true;
         }
 
-        private static void OpenFolder(string path)
+        private static void OpenFolder(string path, bool createIfMissing)
         {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
             try
             {
-                Directory.CreateDirectory(path);
+                if (createIfMissing)
+                {
+                    Directory.CreateDirectory(path);
+                }
                 Process.Start(new ProcessStartInfo("explorer.exe", path) { UseShellExecute = true });
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Diag.Swallowed("opening " + path, ex);
+                MessageBox.Show($"Could not open:\n{path}\n\n{ex.Message}",
+                    "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
         }
     }
 
