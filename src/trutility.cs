@@ -39,7 +39,7 @@ namespace trutility
             get
             {
                 IReadOnlyList<Root> roots = RootsLib.GetGlobalRoots();
-                return roots.Count > 0 ? roots[0].Path : RootsLib.BuiltInGlobalPath;
+                return roots.Count > 0 ? roots[0].Path : RootsLib.ResolveBuiltInGlobalPath();
             }
         }
 
@@ -155,20 +155,28 @@ namespace trutility
         private readonly Control _invokeHelper;
 
         // ── File watchers ─────────────────────────────────────────────────────
-        private FileSystemWatcher _globalWatcher;
-        private FileSystemWatcher _userWatcher;
+        // One watcher per folder currently on the menu: every root plus every
+        // folder reached through a $F shortcut. The set is rebuilt from what the
+        // last scan actually found, so roots arriving and leaving by policy need
+        // no separate bookkeeping.
+        private readonly Dictionary<string, FileSystemWatcher> _watchers =
+            new Dictionary<string, FileSystemWatcher>(StringComparer.OrdinalIgnoreCase);
 
         // ── Debounce ──────────────────────────────────────────────────────────
         private CancellationTokenSource _debounceCts = new CancellationTokenSource();
         private readonly object _debounceLock = new object();
         private const int DebounceMs = 400;
 
+        // ── Recovery polling ──────────────────────────────────────────────────
+        // A folder that could not be watched costs live updates: a department
+        // share behind a VPN that is not up yet, or a watcher killed by a network
+        // blip. Rescanning periodically recovers both. It runs only while
+        // something is actually unwatched, so a healthy setup never polls.
+        private System.Windows.Forms.Timer _recoveryTimer;
+        private const int RecoveryPollMs = 5 * 60 * 1000;
+
         // ── Folder access-error tracking ────────────────────────────────────────
         private HashSet<string> _warnedAccessErrorPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        // ── Watchers for followed shortcut-to-folder targets ──────────────────
-        private readonly Dictionary<string, FileSystemWatcher> _followedWatchers =
-            new Dictionary<string, FileSystemWatcher>(StringComparer.OrdinalIgnoreCase);
 
         // ─────────────────────────────────────────────────────────────────────
         public TrayApplication()
@@ -176,7 +184,11 @@ namespace trutility
             _invokeHelper = new Control();
             _invokeHelper.CreateControl();
 
-            EnsureFoldersExist();
+            // Nothing here may touch a configured folder. A root can sit on a
+            // share that is slow or unreachable, and this runs before the tray
+            // icon exists — probing one would stall the icon for the length of
+            // an SMB timeout at every logon. Folder work happens on the
+            // background rebuild instead.
             ApplyShellPolicy();
 
             _notifyIcon = new NotifyIcon
@@ -193,8 +205,11 @@ namespace trutility
 
             _notifyIcon.MouseClick += OnTrayClick;
 
+            _recoveryTimer = new System.Windows.Forms.Timer { Interval = RecoveryPollMs };
+            _recoveryTimer.Tick += (s, e) => BuildMenuAsync();
+
+            // Watchers are established by the rebuild, from the folders it found.
             BuildMenuAsync();
-            StartFileWatchers();
         }
 
         // ── Tray click ────────────────────────────────────────────────────────
@@ -214,10 +229,48 @@ namespace trutility
 
         // ── Folder setup ──────────────────────────────────────────────────────
 
-        private static void EnsureFoldersExist()
+        /// <summary>
+        /// Creates the folder belonging to the user, and the built-in global
+        /// folder when trutility picked that location itself.
+        ///
+        /// An administrator-provisioned root is never created. Conjuring one
+        /// would turn a mistyped policy path into a silently empty folder rather
+        /// than a visible mistake, and would scatter stray directories across
+        /// whichever share the path pointed at.
+        /// </summary>
+        private static void EnsureFoldersExist(IReadOnlyList<Root> globalRoots, Root userRoot)
         {
-            try { Directory.CreateDirectory(GlobalRoot); } catch { }
-            try { Directory.CreateDirectory(UserRoot); } catch { }
+            foreach (Root root in globalRoots)
+            {
+                if (root.IsBuiltIn)
+                {
+                    TryCreateDirectory(root.Path);
+                }
+            }
+
+            if (userRoot != null)
+            {
+                TryCreateDirectory(userRoot.Path);
+            }
+        }
+
+        private static void TryCreateDirectory(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return;
+            }
+
+            try
+            {
+                Directory.CreateDirectory(path);
+            }
+            catch (Exception ex)
+            {
+                // Missing rights or an unreachable share. The folder simply
+                // contributes nothing to the menu.
+                Diag.Swallowed("creating " + path, ex);
+            }
         }
 
         // ── Menu building ─────────────────────────────────────────────────────
@@ -240,17 +293,25 @@ namespace trutility
                     await Task.Delay(DebounceMs, token);
                     token.ThrowIfCancellationRequested();
 
+                    RootsLib.MigrateLegacyUserRoot();
+
+                    IReadOnlyList<Root> globalRoots = RootsLib.GetGlobalRoots();
+                    Root userRoot = RootsLib.GetUserRoot();
+                    EnsureFoldersExist(globalRoots, userRoot);
+
                     List<string> accessErrors;
                     List<string> followedFolders;
                     MenuNode tree = MenuBuilder.BuildTree(
-                        RootsLib.GetGlobalRoots(), RootsLib.GetUserRoot(),
-                        out accessErrors, out followedFolders);
+                        globalRoots, userRoot, out accessErrors, out followedFolders);
+
+                    List<string> watchPaths = CollectWatchPaths(globalRoots, userRoot, followedFolders);
+                    string userRootPath = userRoot.Path;
 
                     _invokeHelper.BeginInvoke((Action)(() =>
                     {
                         ApplyNewMenu(tree);
-                        ReportAccessErrors(accessErrors);
-                        SyncFollowedWatchers(followedFolders);
+                        ReportAccessErrors(accessErrors, userRootPath);
+                        SyncWatchers(watchPaths);
                     }));
                 }
                 catch (OperationCanceledException) { }
@@ -258,15 +319,52 @@ namespace trutility
             }, token);
         }
 
-        private void ReportAccessErrors(List<string> accessErrors)
+        /// <summary>
+        /// Warns only about folders the user can actually do something about.
+        ///
+        /// A denied or unreachable global root is an administrator matter: the
+        /// user cannot change its permissions and cannot bring its share back,
+        /// so a balloon would only nag on every rebuild. Those are recorded for
+        /// support instead, which is what answers "my department folder is
+        /// missing" without a reproduction.
+        /// </summary>
+        private void ReportAccessErrors(List<string> accessErrors, string userRootPath)
         {
-            var current = new HashSet<string>(accessErrors, StringComparer.OrdinalIgnoreCase);
-            foreach (var path in current)
+            HashSet<string> current = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in accessErrors)
+            {
+                if (RootsLib.IsUnder(path, userRootPath))
+                {
+                    current.Add(path);
+                }
+                else
+                {
+                    Diag.Swallowed("reading administrator-managed folder " + path);
+                }
+            }
+
+            foreach (string path in current)
             {
                 if (!_warnedAccessErrorPaths.Contains(path))
                     ShowBalloon("trutility – folder inaccessible", $"Could not read:\n{path}");
             }
             _warnedAccessErrorPaths = current;
+        }
+
+        private static List<string> CollectWatchPaths(IReadOnlyList<Root> globalRoots, Root userRoot,
+                                                      List<string> followedFolders)
+        {
+            List<string> paths = new List<string>();
+            foreach (Root root in globalRoots)
+            {
+                paths.Add(root.Path);
+            }
+            if (userRoot != null)
+            {
+                paths.Add(userRoot.Path);
+            }
+            paths.AddRange(followedFolders);
+            return paths;
         }
 
         private void ApplyNewMenu(MenuNode tree)
@@ -455,11 +553,9 @@ namespace trutility
             using (var dlg = new AboutDialog(GlobalRoot, UserRoot))
             {
                 dlg.ShowDialog();
-                // If the user changed UserRoot, restart the watchers and rebuild
+                // The rebuild creates the folder and re-points the watchers.
                 if (dlg.UserRootChanged)
                 {
-                    EnsureFoldersExist();
-                    RestartUserWatcher();
                     BuildMenuAsync();
                 }
             }
@@ -467,59 +563,140 @@ namespace trutility
 
         // ── FileSystemWatcher ─────────────────────────────────────────────────
 
-        private void StartFileWatchers()
+        /// <summary>
+        /// Holds one watcher per folder the last scan actually reached — every
+        /// root plus every folder followed through a $F shortcut — so edits
+        /// anywhere on the menu rebuild it live.
+        ///
+        /// Anything that could not be watched turns on recovery polling, which
+        /// is what eventually picks up a department share that was offline when
+        /// trutility started.
+        /// </summary>
+        private void SyncWatchers(List<string> paths)
         {
-            _globalWatcher = CreateWatcher(GlobalRoot);
-            _userWatcher = CreateWatcher(UserRoot);
-        }
+            HashSet<string> wanted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in paths)
+            {
+                string normalized = RootsLib.NormalizeDir(path);
+                if (normalized != null)
+                {
+                    wanted.Add(normalized);
+                }
+            }
 
-        private void RestartUserWatcher()
-        {
-            _userWatcher?.Dispose();
-            _userWatcher = CreateWatcher(UserRoot);
+            foreach (string stale in _watchers.Keys.Except(wanted).ToList())
+            {
+                _watchers[stale].Dispose();
+                _watchers.Remove(stale);
+            }
+
+            int unwatched = 0;
+            foreach (string path in wanted)
+            {
+                if (_watchers.ContainsKey(path))
+                {
+                    continue;
+                }
+
+                FileSystemWatcher watcher = CreateWatcher(path);
+                if (watcher == null)
+                {
+                    unwatched++;
+                    continue;
+                }
+                _watchers[path] = watcher;
+            }
+
+            SetRecoveryPolling(unwatched > 0);
         }
 
         private FileSystemWatcher CreateWatcher(string path)
         {
             if (!Directory.Exists(path)) return null;
 
-            var w = new FileSystemWatcher(path)
+            try
             {
-                IncludeSubdirectories = true,
-                NotifyFilter =
-                    NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite,
-                EnableRaisingEvents = true
-            };
-            w.Created += OnFolderChanged;
-            w.Deleted += OnFolderChanged;
-            w.Renamed += OnFolderChanged;
-            w.Changed += OnFolderChanged;
-            return w;
+                FileSystemWatcher w = new FileSystemWatcher(path)
+                {
+                    IncludeSubdirectories = true,
+                    NotifyFilter =
+                        NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite,
+                    EnableRaisingEvents = true
+                };
+                w.Created += OnFolderChanged;
+                w.Deleted += OnFolderChanged;
+                w.Renamed += OnFolderChanged;
+                w.Changed += OnFolderChanged;
+                w.Error += OnWatcherError;
+                return w;
+            }
+            catch (Exception ex)
+            {
+                // The folder went away between the scan and here, or the path is
+                // one FileSystemWatcher will not accept. Recovery polling retries.
+                Diag.Swallowed("watching " + path, ex);
+                return null;
+            }
         }
 
         private void OnFolderChanged(object sender, FileSystemEventArgs e) => BuildMenuAsync();
 
         /// <summary>
-        /// Keeps one FileSystemWatcher per currently-followed shortcut target
-        /// folder, so edits there rebuild the menu live, just like a real
-        /// subfolder under Global/User root.
+        /// A watcher over SMB dies on a network blip, and any watcher dies when
+        /// its internal buffer overflows during a burst of changes. Neither
+        /// recovers on its own, so the dead watcher is dropped and a rebuild
+        /// re-establishes it.
         /// </summary>
-        private void SyncFollowedWatchers(List<string> followedFolders)
+        private void OnWatcherError(object sender, ErrorEventArgs e)
         {
-            var current = new HashSet<string>(followedFolders, StringComparer.OrdinalIgnoreCase);
+            FileSystemWatcher watcher = sender as FileSystemWatcher;
+            Diag.Swallowed("watching " + (watcher == null ? "?" : watcher.Path), e.GetException());
 
-            foreach (var stalePath in _followedWatchers.Keys.Except(current).ToList())
+            try
             {
-                _followedWatchers[stalePath].Dispose();
-                _followedWatchers.Remove(stalePath);
+                // Fired on a pool thread; _watchers belongs to the UI thread.
+                _invokeHelper.BeginInvoke((Action)(() =>
+                {
+                    DropWatcher(watcher);
+                    SetRecoveryPolling(true);
+                    BuildMenuAsync();
+                }));
+            }
+            catch (Exception ex)
+            {
+                // Shutting down: the helper control is already gone.
+                Diag.Swallowed("scheduling watcher recovery", ex);
+            }
+        }
+
+        private void DropWatcher(FileSystemWatcher watcher)
+        {
+            if (watcher == null)
+            {
+                return;
             }
 
-            foreach (var path in current)
+            foreach (string key in _watchers.Where(p => ReferenceEquals(p.Value, watcher))
+                                            .Select(p => p.Key).ToList())
             {
-                if (_followedWatchers.ContainsKey(path)) continue;
-                var watcher = CreateWatcher(path);
-                if (watcher != null)
-                    _followedWatchers[path] = watcher;
+                _watchers.Remove(key);
+            }
+
+            try
+            {
+                watcher.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Diag.Swallowed("disposing a watcher", ex);
+            }
+        }
+
+        private void SetRecoveryPolling(bool enabled)
+        {
+            if (_recoveryTimer != null && _recoveryTimer.Enabled != enabled)
+            {
+                _recoveryTimer.Enabled = enabled;
             }
         }
 
@@ -534,11 +711,11 @@ namespace trutility
         {
             _debounceCts?.Cancel();
             _debounceCts?.Dispose();
-            _globalWatcher?.Dispose();
-            _userWatcher?.Dispose();
-            foreach (var watcher in _followedWatchers.Values)
+            _recoveryTimer?.Stop();
+            _recoveryTimer?.Dispose();
+            foreach (FileSystemWatcher watcher in _watchers.Values)
                 watcher.Dispose();
-            _followedWatchers.Clear();
+            _watchers.Clear();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
             _menu?.Dispose();
@@ -556,6 +733,10 @@ namespace trutility
 
         private readonly string _globalRoot;
         private string _userRoot;
+
+        /// True when Change… picked a path, false when Reset asked to fall back.
+        /// Only meaningful while UserRootChanged is set.
+        private bool _userRootExplicitlyChosen;
         private Label _userRootLabel;
         private CheckBox _chkShell;
         private CheckBox _chkStartup;
@@ -734,8 +915,20 @@ namespace trutility
             if (_chkTrayPin.Enabled)
                 SettingsTrayPin.SaveTrayPin(_chkTrayPin.Checked);
 
+            // Reset means "drop my choice and fall back", not "pin the path the
+            // fallback currently resolves to" — writing it back would make the
+            // default permanent and survive a later policy change.
             if (UserRootChanged)
-                TrayApplication.SetUserRoot(_userRoot);
+            {
+                if (_userRootExplicitlyChosen)
+                {
+                    RootsLib.SetUserRoot(_userRoot);
+                }
+                else
+                {
+                    RootsLib.ClearUserRoot();
+                }
+            }
 
             DialogResult = DialogResult.OK;
             Close();
@@ -752,16 +945,19 @@ namespace trutility
             {
                 _userRoot = dlg.SelectedPath;
                 _userRootLabel.Text = _userRoot;
+                _userRootExplicitlyChosen = true;
                 UserRootChanged = true;
             }
         }
 
+        /// Previews the fallback without applying it, so closing the dialog
+        /// without pressing OK leaves the current folder alone — the same way
+        /// Change… behaves.
         private void OnResetUserRoot(object sender, EventArgs e)
         {
-            RootsLib.ClearUserRoot();
-
-            _userRoot = TrayApplication.UserRoot;   // re-read default
+            _userRoot = RootsLib.ResolveDefaultUserRootPath();
             _userRootLabel.Text = _userRoot;
+            _userRootExplicitlyChosen = false;
             UserRootChanged = true;
         }
 

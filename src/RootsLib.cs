@@ -50,6 +50,12 @@ namespace trutility
         /// Set to false by policy to switch a root off without deleting its key.
         public bool Enabled { get; set; } = true;
 
+        /// True only for the folder trutility picked itself. Administrator-
+        /// provisioned roots are never created by the application: doing so
+        /// would turn a mistyped policy path into a silently empty folder
+        /// instead of a visible mistake.
+        public bool IsBuiltIn { get; set; }
+
         /// Human-readable origin, surfaced in the About dialog.
         public string Source { get; set; }
     }
@@ -95,13 +101,50 @@ namespace trutility
 
         // ── Built-in fallbacks ────────────────────────────────────────────────
 
+        /// ProgramData rather than Program Files: this is machine-wide
+        /// application data, not binaries, and Program Files cannot be written
+        /// without elevation or without tripping UAC virtualisation.
         internal static string BuiltInGlobalPath =>
+            System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "trutility");
+
+        /// LOCALAPPDATA rather than Documents. The folder belonging to the user
+        /// is meant to be local and always reachable, and Folder Redirection
+        /// routinely points Documents at a network share — which would put the
+        /// one root that must never be remote on a UNC path for most domain
+        /// users. LOCALAPPDATA is never roamed or redirected.
+        internal static string BuiltInUserPath =>
+            System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "trutility");
+
+        /// Where the built-in user folder used to live, kept only so an existing
+        /// install can be recognised and preserved.
+        private static string LegacyUserPath =>
+            System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "trutility");
+
+        private static string LegacyGlobalPath =>
             System.IO.Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "trutility");
 
-        internal static string BuiltInUserPath =>
-            System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "trutility");
+        /// <summary>
+        /// ProgramData, unless an install is still keeping tools in the old
+        /// Program Files location, which then keeps working.
+        ///
+        /// The global default cannot be pinned to HKLM the way the user default
+        /// is pinned to HKCU, because trutility does not run elevated — so the
+        /// preference is expressed in resolution rather than written down. An
+        /// administrator who wants the new location moves the content, or names
+        /// it explicitly through a root.
+        /// </summary>
+        internal static string ResolveBuiltInGlobalPath()
+        {
+            if (HasContent(LegacyGlobalPath) && !HasContent(BuiltInGlobalPath))
+            {
+                return LegacyGlobalPath;
+            }
+            return BuiltInGlobalPath;
+        }
 
         // ── Global roots ──────────────────────────────────────────────────────
 
@@ -153,10 +196,11 @@ namespace trutility
             return new Root
             {
                 Name = DefaultRootName,
-                Path = BuiltInGlobalPath,
+                Path = ResolveBuiltInGlobalPath(),
                 Scope = RootScope.Global,
                 Order = 0,
                 Source = "built-in default",
+                IsBuiltIn = true,
             };
         }
 
@@ -175,6 +219,7 @@ namespace trutility
 
             Root root = GetOrAdd(acc, DefaultRootName, 0);
             root.Path = path;
+            root.IsBuiltIn = false;
             root.Source = @"HKLM\" + RegKeyPath + @"\" + RegValGlobal + " (legacy)";
         }
 
@@ -226,6 +271,7 @@ namespace trutility
             if (path != null)
             {
                 root.Path = path;
+                root.IsBuiltIn = false;
             }
 
             string label = key.GetValue("Label") as string;
@@ -283,21 +329,26 @@ namespace trutility
 
         internal static string ResolveUserRootPath()
         {
-            string path = ReadValuePath(Registry.CurrentUser, RegKeyPath, RegValUser);
-            if (path != null)
-            {
-                return path;
-            }
+            string chosen = ReadValuePath(Registry.CurrentUser, RegKeyPath, RegValUser);
+            return chosen ?? ResolveDefaultUserRootPath();
+        }
 
+        /// <summary>
+        /// Where the user root would land if the explicit HKCU choice were
+        /// dropped: a location pinned by an administrator, or the built-in
+        /// default. Lets the About dialog preview a reset without performing one.
+        /// </summary>
+        internal static string ResolveDefaultUserRootPath()
+        {
             List<RegistryKey> hklm = OpenLocalMachineViews();
             try
             {
                 foreach (RegistryKey view in hklm)
                 {
-                    path = ReadValuePath(view, RegKeyPath, RegValUser);
-                    if (path != null)
+                    string pinned = ReadValuePath(view, RegKeyPath, RegValUser);
+                    if (pinned != null)
                     {
-                        return path;
+                        return pinned;
                     }
                 }
             }
@@ -307,6 +358,61 @@ namespace trutility
             }
 
             return BuiltInUserPath;
+        }
+
+        /// <summary>
+        /// Keeps an existing install on the folder it is already using.
+        ///
+        /// The built-in user location moved from Documents to LOCALAPPDATA. Anyone
+        /// already keeping shortcuts under the old default would otherwise find an
+        /// empty menu after upgrading, so the path in use is written to HKCU once
+        /// and the new default applies only to installs with nothing there yet.
+        ///
+        /// Runs at most once per process, and only touches the disk when HKCU
+        /// carries no choice — so a redirected Documents folder on an unreachable
+        /// share is probed once at worst, never on every rebuild.
+        /// </summary>
+        internal static void MigrateLegacyUserRoot()
+        {
+            if (System.Threading.Interlocked.Exchange(ref _legacyMigrationDone, 1) != 0)
+            {
+                return;
+            }
+
+            if (ReadValuePath(Registry.CurrentUser, RegKeyPath, RegValUser) != null)
+            {
+                return;   // the user already has an explicit choice
+            }
+
+            if (IsUserRootManagedByPolicy())
+            {
+                return;   // an administrator decides the location; do not shadow it
+            }
+
+            string legacy = LegacyUserPath;
+            if (!HasContent(legacy))
+            {
+                return;
+            }
+
+            SetUserRoot(legacy);
+        }
+
+        private static int _legacyMigrationDone;
+
+        private static bool HasContent(string directory)
+        {
+            try
+            {
+                return System.IO.Directory.Exists(directory)
+                    && System.IO.Directory.EnumerateFileSystemEntries(directory).Any();
+            }
+            catch (Exception ex)
+            {
+                // An unreachable or denied folder is not something to migrate on to.
+                Diag.Swallowed("inspecting " + directory, ex);
+                return false;
+            }
         }
 
         internal static void SetUserRoot(string path)
