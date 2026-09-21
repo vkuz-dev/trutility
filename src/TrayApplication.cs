@@ -318,7 +318,7 @@ namespace trutility
 
                 try
                 {
-                    RebuildMenu();
+                    RebuildMenu(token);
                 }
                 catch (Exception ex)
                 {
@@ -329,7 +329,7 @@ namespace trutility
 
         /// Resolves the folders, scans them, and hands the result back to the UI
         /// thread. Runs entirely off the UI thread: a root may be unreachable.
-        private void RebuildMenu()
+        private void RebuildMenu(CancellationToken token)
         {
             RootsLib.MigrateLegacyUserRoot();
 
@@ -351,6 +351,50 @@ namespace trutility
                 ReportAccessErrors(accessErrors, userRootPath);
                 SyncWatchers(watchPaths);
             }));
+
+            // The menu is already usable at this point; this only fills the
+            // cache the next open will read from.
+            WarmIconCache(tree, token);
+        }
+
+        /// <summary>
+        /// Loads every icon in the tree into the cache, on the thread that just
+        /// finished the scan.
+        ///
+        /// A shell icon lookup costs a few milliseconds and has to happen once
+        /// per file no matter what. The only real choice is which thread pays
+        /// and when: building the menu with them froze the tray when a folder
+        /// was added, and loading them on open put a hitch on every first look
+        /// inside a folder — which is the far more frequent event. Here the UI
+        /// thread pays neither, and a menu that is opened later finds every icon
+        /// already cached.
+        ///
+        /// Breadth-first, so the levels most likely to be opened are ready
+        /// first, and abandoned as soon as a newer rebuild supersedes this one.
+        /// </summary>
+        private static void WarmIconCache(MenuNode root, CancellationToken token)
+        {
+            Queue<MenuNode> pending = new Queue<MenuNode>();
+            pending.Enqueue(root);
+
+            while (pending.Count > 0)
+            {
+                if (token.IsCancellationRequested) return;
+
+                foreach (MenuNode child in pending.Dequeue().Children)
+                {
+                    if (token.IsCancellationRequested) return;
+
+                    if (child.IsFolder)
+                    {
+                        pending.Enqueue(child);
+                    }
+                    else if (child.FilePath != null)
+                    {
+                        IconsLib.Prewarm(child.FilePath);
+                    }
+                }
+            }
         }
 
         /// <summary>

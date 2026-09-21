@@ -67,6 +67,25 @@ namespace trutility
         /// </summary>
         public static Bitmap GetIcon(string filePath)
         {
+            return Copy(Resolve(filePath));
+        }
+
+        /// <summary>
+        /// Loads an icon into the cache without handing one back.
+        ///
+        /// Called off the UI thread after a scan, so that by the time a menu is
+        /// opened every icon in it is already a cache hit. The lookup has to
+        /// happen once per file whatever else changes; this decides that it
+        /// happens on a background thread rather than in front of the user.
+        /// </summary>
+        public static void Prewarm(string filePath)
+        {
+            Resolve(filePath);
+        }
+
+        /// Returns the cached instance itself, which only Copy may hand out.
+        private static Bitmap Resolve(string filePath)
+        {
             if (string.IsNullOrWhiteSpace(filePath))
             {
                 return null;
@@ -79,7 +98,7 @@ namespace trutility
                 Bitmap hit;
                 if (Cache.TryGetValue(key, out hit))
                 {
-                    return Copy(hit);
+                    return hit;
                 }
             }
 
@@ -93,7 +112,7 @@ namespace trutility
                 Store(key, fetched);
             }
 
-            return Copy(fetched);
+            return fetched;
         }
 
         private static void Store(string key, Bitmap value)
