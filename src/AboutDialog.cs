@@ -46,6 +46,21 @@ namespace trutility
             MinimumSize = new Size(640, 520);
 
             Controls.Add(BuildLayout());
+        }
+
+        /// <summary>
+        /// The folder probe starts here rather than in the constructor.
+        ///
+        /// Results are delivered with BeginInvoke, which needs a window handle,
+        /// and the handle does not exist until the form is shown. Started from
+        /// the constructor it was a race: once the thread pool is warm the probe
+        /// finishes first, finds no handle to post to, and the column stays on
+        /// "Checking..." for as long as the dialog is open. Losing that race was
+        /// the normal case in a process that had been running for a while.
+        /// </summary>
+        protected override void OnShown(EventArgs e)
+        {
+            base.OnShown(e);
             ProbeRootStatusesAsync();
         }
 
@@ -361,7 +376,16 @@ namespace trutility
             {
                 int index = i;
                 string path = _globalRoots[i].Path;
-                Task.Run(() => ReportStatus(index, DescribeStatus(path)));
+
+                // A dedicated thread rather than the pool. These probes can block
+                // for the length of an SMB timeout, which is what the pool is
+                // worst at: it would hold a worker hostage and make the healthy
+                // roots wait behind its slow thread injection.
+                Task.Factory.StartNew(
+                    () => ReportStatus(index, DescribeStatus(path)),
+                    System.Threading.CancellationToken.None,
+                    TaskCreationOptions.LongRunning,
+                    TaskScheduler.Default);
             }
         }
 
