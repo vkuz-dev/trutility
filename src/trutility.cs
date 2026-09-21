@@ -22,62 +22,34 @@ namespace trutility
     {
         // ── Registry ──────────────────────────────────────────────────────────
         private const string RegKeyPath = @"SOFTWARE\trutility";
-        private const string RegValUser = "UserRoot";
-        private const string RegValGlobal = "GlobalRoot";
         private const string RegValShell = "AddToShell";
 
         // ── Folder paths ──────────────────────────────────────────────────────
+        //
+        // Resolution lives in RootsLib, which is the single place that knows how
+        // folders are configured. The two accessors below are the remaining
+        // single-root call sites; they are replaced by the full root list when
+        // the menu builder and watchers are ported.
 
-        /// HKLM\SOFTWARE\trutility\GlobalRoot → CommonProgramFiles\trutility fallback.
+        /// First resolved global root. Identical to the previous behaviour while
+        /// no Roots keys exist, since the legacy GlobalRoot value and the built-in
+        /// default both resolve to the "Default" root at Order 0.
         internal static string GlobalRoot
         {
             get
             {
-                using (var key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
-                {
-                    var val = key?.GetValue(RegValGlobal) as string;
-                    if (!string.IsNullOrWhiteSpace(val))
-                        return val;
-                }
-                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "trutility");
+                IReadOnlyList<Root> roots = RootsLib.GetGlobalRoots();
+                return roots.Count > 0 ? roots[0].Path : RootsLib.BuiltInGlobalPath;
             }
         }
 
-        /// HKCU → HKLM\SOFTWARE\trutility\UserRoot → MyDocuments\trutility fallback.
-        internal static string UserRoot
-        {
-            get
-            {
-                using (var key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
-                {
-                    var val = key?.GetValue(RegValUser) as string;
-                    if (!string.IsNullOrWhiteSpace(val))
-                        return val;
-                }
-                using (var key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
-                {
-                    var val = key?.GetValue(RegValUser) as string;
-                    if (!string.IsNullOrWhiteSpace(val))
-                        return val;
-                }
-                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "trutility");
-            }
-        }
+        /// The folder belonging to the user — the only one trutility writes to.
+        internal static string UserRoot => RootsLib.ResolveUserRootPath();
 
-        internal static void SetUserRoot(string path)
-        {
-            using (var key = Registry.CurrentUser.CreateSubKey(RegKeyPath))
-                key.SetValue(RegValUser, path);
-        }
+        internal static void SetUserRoot(string path) => RootsLib.SetUserRoot(path);
 
-        /// True when HKLM carries UserRoot but HKCU has no explicit override yet.
-        internal static bool IsUserRootManagedByPolicy()
-        {
-            using (var key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
-                if (key?.GetValue(RegValUser) != null) return false;
-            using (var key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
-                return key?.GetValue(RegValUser) != null;
-        }
+        /// True when HKLM pins the location and HKCU has no explicit override yet.
+        internal static bool IsUserRootManagedByPolicy() => RootsLib.IsUserRootManagedByPolicy();
 
         // ── Shell verb helpers ────────────────────────────────────────────────
 
@@ -408,9 +380,12 @@ namespace trutility
 
         private void TryDeleteUserFile(string path)
         {
-            // Only allow deleting files that actually live inside UserRoot
-            var userRoot = UserRoot;
-            if (!path.StartsWith(userRoot, StringComparison.OrdinalIgnoreCase))
+            // The user root is the only location trutility ever writes to; global
+            // roots are administrator-managed and strictly read-only. IsUnder
+            // normalises both sides and compares on a separator boundary, so a
+            // global root sitting next to the user root (D:\tools-shared beside
+            // D:\tools) cannot be deleted through the menu.
+            if (!RootsLib.IsUnder(path, UserRoot))
             {
                 ShowBalloon("trutility", "Only files in your User folder can be deleted from the menu.");
                 return;
@@ -769,8 +744,7 @@ namespace trutility
 
         private void OnResetUserRoot(object sender, EventArgs e)
         {
-            using (var key = Registry.CurrentUser.OpenSubKey(@"Software\trutility", writable: true))
-                key?.DeleteValue("UserRoot", throwOnMissingValue: false);
+            RootsLib.ClearUserRoot();
 
             _userRoot = TrayApplication.UserRoot;   // re-read default
             _userRootLabel.Text = _userRoot;
