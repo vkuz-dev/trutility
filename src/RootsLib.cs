@@ -184,11 +184,40 @@ namespace trutility
                 CloseLocalMachineViews(hklm);
             }
 
-            return acc.Values
+            List<Root> resolved = acc.Values
                 .Where(r => r.Enabled && !string.IsNullOrWhiteSpace(r.Path))
                 .OrderBy(r => r.Order)
                 .ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+            TraceResolvedRoots(resolved);
+            return resolved;
+        }
+
+        private static string _lastTracedRoots;
+
+        /// <summary>
+        /// Records which roots resolved and where each came from, the first time
+        /// and whenever the set changes.
+        ///
+        /// None of this belongs in front of the person using trutility: the
+        /// folders are not theirs to manage and knowing which registry key
+        /// produced one would not help them. It stays in a trace, where the
+        /// administrator answering "my department folder is missing" can read it.
+        /// </summary>
+        private static void TraceResolvedRoots(IReadOnlyList<Root> roots)
+        {
+            string signature = roots.Count == 0
+                ? "(none)"
+                : string.Join("; ", roots.Select(r => r.Name + " -> " + r.Path + " [" + r.Source + "]"));
+
+            if (signature == _lastTracedRoots)
+            {
+                return;
+            }
+
+            _lastTracedRoots = signature;
+            Diag.Note("global folders resolved: " + signature);
         }
 
         private static Root BuiltInDefaultRoot()

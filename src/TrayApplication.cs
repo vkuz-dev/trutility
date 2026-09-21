@@ -670,7 +670,7 @@ namespace trutility
 
         private void OnAbout(object sender, EventArgs e)
         {
-            using (AboutDialog dlg = new AboutDialog(RootsLib.GetGlobalRoots(), RootsLib.GetUserRoot()))
+            using (AboutDialog dlg = new AboutDialog(RootsLib.GetUserRoot()))
             {
                 dlg.ShowDialog();
                 // The rebuild creates the folder and re-points the watchers.

@@ -30,6 +30,12 @@ namespace trutility
             Trace.WriteLine("trutility: " + what + " failed");
         }
 
+        /// Records something worth knowing that is not a failure.
+        internal static void Note(string what)
+        {
+            Trace.WriteLine("trutility: " + what);
+        }
+
         private static string Describe(Exception ex)
         {
             if (ex == null)
