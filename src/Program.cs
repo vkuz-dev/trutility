@@ -22,7 +22,7 @@ namespace trutility
             }
 
             // ── Normal single-instance tray run ───────────────────────────────
-            using (var mutex = new System.Threading.Mutex(true, "trutility_SingleInstance", out bool isNew))
+            using (System.Threading.Mutex mutex = new System.Threading.Mutex(true, "trutility_SingleInstance", out bool isNew))
             {
                 if (!isNew)
                     return;
@@ -30,7 +30,7 @@ namespace trutility
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
-                using (var app = new TrayApplication())
+                using (TrayApplication app = new TrayApplication())
                 {
                     Application.Run();
                 }

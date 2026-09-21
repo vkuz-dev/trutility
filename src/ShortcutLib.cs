@@ -15,7 +15,7 @@ namespace trutility
             targetPath = null;
             try
             {
-                var wshType = Type.GetTypeFromProgID("WScript.Shell");
+                Type wshType = Type.GetTypeFromProgID("WScript.Shell");
                 if (wshType == null) return false;
 
                 dynamic shell = Activator.CreateInstance(wshType);
@@ -27,8 +27,11 @@ namespace trutility
                 targetPath = target;
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                // A broken or dangling shortcut costs that one menu entry, not
+                // the scan it was found in.
+                Diag.Swallowed("resolving shortcut " + lnkPath, ex);
                 return false;
             }
         }

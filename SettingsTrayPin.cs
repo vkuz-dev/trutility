@@ -16,7 +16,7 @@ namespace trutility.Settings
         public static bool IsPinEnabled()
         {
             // HKCU
-            using (var key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
             {
                 object val = key?.GetValue(PinValueName);
                 if (val != null)
@@ -24,7 +24,7 @@ namespace trutility.Settings
             }
 
             // HKLM 
-            using (var key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
             {
                 object val = key?.GetValue(PinValueName);
                 if (val != null)
@@ -37,7 +37,7 @@ namespace trutility.Settings
         public static void SaveTrayPin(bool enable)
         {
             // Persist user preference
-            using (var key = Registry.CurrentUser.CreateSubKey(RegKeyPath))
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RegKeyPath))
                 key?.SetValue(PinValueName, enable ? 1 : 0, RegistryValueKind.DWord);
 
             // Apply to the live NotifyIconSettings entries
@@ -51,10 +51,10 @@ namespace trutility.Settings
         /// </summary>
         public static bool IsManagedByPolicy()
         {
-            using (var key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
                 if (key?.GetValue(PinValueName) != null) return false;
 
-            using (var key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
                 return key?.GetValue(PinValueName) != null;
         }
 
@@ -73,14 +73,14 @@ namespace trutility.Settings
 
             try
             {
-                using (var root = Registry.CurrentUser.OpenSubKey(
+                using (RegistryKey root = Registry.CurrentUser.OpenSubKey(
                     NotifyIconRegPath, writable: true))
                 {
                     if (root == null) return;   // key won't exist until the app has been run at least once
 
                     foreach (string subName in root.GetSubKeyNames())
                     {
-                        using (var sub = root.OpenSubKey(subName, writable: true))
+                        using (RegistryKey sub = root.OpenSubKey(subName, writable: true))
                         {
                             if (sub == null) continue;
 
@@ -98,10 +98,12 @@ namespace trutility.Settings
                     }
                 }
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
-                // NotifyIconSettings is always HKCU so this shouldn't happen,
-                // but swallow it gracefully rather than crashing the app.
+                // NotifyIconSettings is always HKCU so this should not happen,
+                // and a tray icon that failed to pin is not worth taking the
+                // application down for.
+                Diag.Swallowed("applying the tray pin state", ex);
             }
         }
     }

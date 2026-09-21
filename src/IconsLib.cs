@@ -54,8 +54,8 @@ namespace trutility
 
         private static Bitmap FetchIcon(string filePath, uint flags)
         {
-            var info = new SHFILEINFO();
-            var result = SHGetFileInfo(
+            SHFILEINFO info = new SHFILEINFO();
+            IntPtr result = SHGetFileInfo(
                 filePath, 0,
                 ref info, (uint)Marshal.SizeOf(info),
                 flags);
@@ -65,15 +65,17 @@ namespace trutility
 
             try
             {
-                using (var icon = Icon.FromHandle(info.hIcon))
+                using (Icon icon = Icon.FromHandle(info.hIcon))
                 {
                     // Clone immediately — the bitmap must not reference
                     // the HICON after DestroyIcon is called in finally.
                     return new Bitmap(icon.ToBitmap());
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                // An unreadable icon costs that entry its image, nothing more.
+                Diag.Swallowed("reading the icon for " + filePath, ex);
                 return null;
             }
             finally
@@ -84,8 +86,8 @@ namespace trutility
 
         private static Bitmap ResizeBitmap(Bitmap source, int width, int height)
         {
-            var dest = new Bitmap(width, height);
-            using (var g = Graphics.FromImage(dest))
+            Bitmap dest = new Bitmap(width, height);
+            using (Graphics g = Graphics.FromImage(dest))
             {
                 g.InterpolationMode = InterpolationMode.HighQualityBicubic;
                 g.DrawImage(source, 0, 0, width, height);

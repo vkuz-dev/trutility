@@ -45,9 +45,17 @@ namespace trutility
             ClientSize = new Size(780, 700);
             MinimumSize = new Size(640, 520);
 
-            // A single column that grows with the window. The folder list is the
-            // only row given the slack, because it is the one whose length is
-            // decided by policy rather than by this layout.
+            Controls.Add(BuildLayout());
+            ProbeRootStatusesAsync();
+        }
+
+        /// <summary>
+        /// A single column that grows with the window. The folder list is the
+        /// only row given the slack, because it is the one whose length policy
+        /// decides rather than this layout.
+        /// </summary>
+        private TableLayoutPanel BuildLayout()
+        {
             TableLayoutPanel layout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
@@ -66,19 +74,19 @@ namespace trutility
                 BuildHelpGroup(),
                 BuildButtonRow(),
             };
+            Control stretched = rows[1];
 
             foreach (Control row in rows)
             {
                 row.Dock = DockStyle.Fill;
                 row.Margin = new Padding(0, 0, 0, 10);
-                layout.RowStyles.Add(row == rows[1]
+                layout.RowStyles.Add(row == stretched
                     ? new RowStyle(SizeType.Percent, 100f)
                     : new RowStyle(SizeType.AutoSize));
                 layout.Controls.Add(row);
             }
 
-            Controls.Add(layout);
-            ProbeRootStatusesAsync();
+            return layout;
         }
 
         // ── Sections ──────────────────────────────────────────────────────────
@@ -116,38 +124,7 @@ namespace trutility
                 MinimumSize = new Size(0, 190),
             };
 
-            _rootsList = new ListView
-            {
-                Dock = DockStyle.Fill,
-                View = View.Details,
-                FullRowSelect = true,
-                MultiSelect = false,
-                HideSelection = false,
-                UseCompatibleStateImageBehavior = false,
-            };
-            _rootsList.Columns.Add("Name", 100);
-            _rootsList.Columns.Add("Shown as", 100);
-            _rootsList.Columns.Add("Location", 210);
-            _rootsList.Columns.Add("Configured in", 210);
-            _rootsList.Columns.Add("Status", 90);
-
-            foreach (Root root in _globalRoots)
-            {
-                ListViewItem item = new ListViewItem(new[]
-                {
-                    root.Name,
-                    string.IsNullOrWhiteSpace(root.Label) ? "(top level)" : root.Label,
-                    root.Path,
-                    root.Source ?? "",
-                    StatusChecking,
-                })
-                { Tag = root.Path };
-                _rootsList.Items.Add(item);
-            }
-
-            _rootsList.SelectedIndexChanged += (s, e) =>
-                _btnOpenSelected.Enabled = _rootsList.SelectedItems.Count > 0;
-            _rootsList.DoubleClick += (s, e) => OpenSelectedRoot();
+            _rootsList = BuildRootsList();
 
             _btnOpenSelected = new Button
             {
@@ -177,6 +154,49 @@ namespace trutility
             return group;
         }
 
+        private ListView BuildRootsList()
+        {
+            ListView list = new ListView
+            {
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                MultiSelect = false,
+                HideSelection = false,
+                UseCompatibleStateImageBehavior = false,
+            };
+            list.Columns.Add("Name", 100);
+            list.Columns.Add("Shown as", 100);
+            list.Columns.Add("Location", 210);
+            list.Columns.Add("Configured in", 210);
+            list.Columns.Add("Status", 90);
+
+            foreach (Root root in _globalRoots)
+            {
+                list.Items.Add(NewRootRow(root));
+            }
+
+            list.SelectedIndexChanged += (s, e) =>
+                _btnOpenSelected.Enabled = list.SelectedItems.Count > 0;
+            list.DoubleClick += (s, e) => OpenSelectedRoot();
+            return list;
+        }
+
+        /// "Shown as" is where Label becomes visible: a labelled root reads as
+        /// its label, an unlabelled one splices in at the top of the menu.
+        private static ListViewItem NewRootRow(Root root)
+        {
+            return new ListViewItem(new[]
+            {
+                root.Name,
+                string.IsNullOrWhiteSpace(root.Label) ? "(top level)" : root.Label,
+                root.Path,
+                root.Source ?? "",
+                StatusChecking,
+            })
+            { Tag = root.Path };
+        }
+
         private Control BuildUserGroup()
         {
             bool managed = TrayApplication.IsUserRootManagedByPolicy();
@@ -201,6 +221,15 @@ namespace trutility
                 AutoEllipsis = true,
             };
 
+            group.Controls.Add(_userRootLabel);
+            group.Controls.Add(BuildUserButtons(managed));
+            return group;
+        }
+
+        /// Change… and Reset follow the location policy; Open never does, because
+        /// reaching your own folder is not something policy takes away.
+        private FlowLayoutPanel BuildUserButtons(bool managed)
+        {
             FlowLayoutPanel buttons = new FlowLayoutPanel
             {
                 Dock = DockStyle.Bottom,
@@ -218,9 +247,7 @@ namespace trutility
             open.Click += (s, e) => OpenFolder(_userRoot, createIfMissing: true);
 
             buttons.Controls.AddRange(new Control[] { change, reset, open });
-            group.Controls.Add(_userRootLabel);
-            group.Controls.Add(buttons);
-            return group;
+            return buttons;
         }
 
         private Control BuildSettingsGroup()
@@ -439,7 +466,7 @@ namespace trutility
 
         private void OnChangeUserRoot(object sender, EventArgs e)
         {
-            using var dlg = new FolderBrowserDialog();
+            using FolderBrowserDialog dlg = new FolderBrowserDialog();
             dlg.Description = "Select the folder where trutility will store your personal shortcuts.";
             dlg.SelectedPath = _userRoot;
             dlg.ShowNewFolderButton = true;

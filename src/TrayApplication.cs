@@ -57,12 +57,12 @@ namespace trutility
         /// HKCU → HKLM → actual verb registration (legacy fallback).
         internal static bool IsShellVerbEnabled()
         {
-            using (var key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
             {
                 object val = key?.GetValue(RegValShell);
                 if (val != null) return Convert.ToInt32(val) != 0;
             }
-            using (var key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
             {
                 object val = key?.GetValue(RegValShell);
                 if (val != null) return Convert.ToInt32(val) != 0;
@@ -73,22 +73,22 @@ namespace trutility
         /// True when HKLM carries AddToShell but HKCU has no explicit override yet.
         internal static bool IsShellVerbManagedByPolicy()
         {
-            using (var key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
+            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
                 if (key?.GetValue(RegValShell) != null) return false;
-            using (var key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
+            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
                 return key?.GetValue(RegValShell) != null;
         }
 
         internal static void SaveShellPref(bool enable)
         {
-            using (var key = Registry.CurrentUser.CreateSubKey(RegKeyPath))
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RegKeyPath))
                 key?.SetValue(RegValShell, enable ? 1 : 0, RegistryValueKind.DWord);
         }
 
         /// Applies HKLM AddToShell policy on startup when the user has no HKCU override.
         internal static void ApplyShellPolicy()
         {
-            using (var hkcu = Registry.CurrentUser.OpenSubKey(RegKeyPath))
+            using (RegistryKey hkcu = Registry.CurrentUser.OpenSubKey(RegKeyPath))
             {
                 object hkcuVal = hkcu?.GetValue(RegValShell);
                 if (hkcuVal != null)
@@ -98,7 +98,7 @@ namespace trutility
                     return;
                 }
             }
-            using (var hklm = Registry.LocalMachine.OpenSubKey(RegKeyPath))
+            using (RegistryKey hklm = Registry.LocalMachine.OpenSubKey(RegKeyPath))
             {
                 object hklmVal = hklm?.GetValue(RegValShell);
                 if (hklmVal != null)
@@ -117,36 +117,57 @@ namespace trutility
 
         internal static void RegisterShellVerb()
         {
-            var exe = Assembly.GetExecutingAssembly().Location;
+            string exe = Assembly.GetExecutingAssembly().Location;
 
             // Register for files
-            using (var key = Registry.CurrentUser.CreateSubKey(ShellRegBaseFiles))
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(ShellRegBaseFiles))
             {
                 key.SetValue(null, "Add to trutility");
                 key.SetValue("Icon", $"\"{exe}\"");
             }
-            using (var cmd = Registry.CurrentUser.CreateSubKey(ShellCommandFiles))
+            using (RegistryKey cmd = Registry.CurrentUser.CreateSubKey(ShellCommandFiles))
                 cmd.SetValue(null, $"\"{exe}\" --add \"%1\"");
 
             // Register for folders
-            using (var key = Registry.CurrentUser.CreateSubKey(ShellRegBaseFolders))
+            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(ShellRegBaseFolders))
             {
                 key.SetValue(null, "Add to trutility");
                 key.SetValue("Icon", $"\"{exe}\"");
             }
-            using (var cmd = Registry.CurrentUser.CreateSubKey(ShellCommandFolders))
+            using (RegistryKey cmd = Registry.CurrentUser.CreateSubKey(ShellCommandFolders))
                 cmd.SetValue(null, $"\"{exe}\" --add \"%1\"");
         }
 
         internal static void UnregisterShellVerb()
         {
-            try { Registry.CurrentUser.DeleteSubKeyTree(ShellRegBaseFiles); } catch { }
-            try { Registry.CurrentUser.DeleteSubKeyTree(ShellRegBaseFolders); } catch { }
+            DeleteShellKey(ShellRegBaseFiles);
+            DeleteShellKey(ShellRegBaseFolders);
+        }
+
+        /// <summary>
+        /// DeleteSubKeyTree throws when the key is absent, which is the ordinary
+        /// state whenever the verb was never registered. Absence is checked
+        /// rather than caught, so only a real failure is reported.
+        /// </summary>
+        private static void DeleteShellKey(string path)
+        {
+            try
+            {
+                using (RegistryKey key = Registry.CurrentUser.OpenSubKey(path))
+                {
+                    if (key == null) return;
+                }
+                Registry.CurrentUser.DeleteSubKeyTree(path);
+            }
+            catch (Exception ex)
+            {
+                Diag.Swallowed("removing the shell verb at " + path, ex);
+            }
         }
 
         internal static bool IsShellVerbRegistered()
         {
-            using (var k = Registry.CurrentUser.OpenSubKey(ShellRegBaseFiles))
+            using (RegistryKey k = Registry.CurrentUser.OpenSubKey(ShellRegBaseFiles))
                 return k != null;
         }
 
@@ -221,7 +242,7 @@ namespace trutility
             {
                 if (_menu != null)
                 {
-                    var mi = typeof(NotifyIcon).GetMethod("ShowContextMenu",
+                    MethodInfo mi = typeof(NotifyIcon).GetMethod("ShowContextMenu",
                         BindingFlags.Instance | BindingFlags.NonPublic);
                     mi?.Invoke(_notifyIcon, null);
                 }
@@ -289,35 +310,47 @@ namespace trutility
 
             Task.Run(async () =>
             {
+                // Being superseded is the ordinary outcome during a burst of file
+                // events, not a failure, so the token is read rather than passed
+                // to Task.Delay — otherwise the common path would throw.
+                await Task.Delay(DebounceMs);
+                if (token.IsCancellationRequested) return;
+
                 try
                 {
-                    await Task.Delay(DebounceMs, token);
-                    token.ThrowIfCancellationRequested();
-
-                    RootsLib.MigrateLegacyUserRoot();
-
-                    IReadOnlyList<Root> globalRoots = RootsLib.GetGlobalRoots();
-                    Root userRoot = RootsLib.GetUserRoot();
-                    EnsureFoldersExist(globalRoots, userRoot);
-
-                    List<string> accessErrors;
-                    List<string> followedFolders;
-                    MenuNode tree = MenuBuilder.BuildTree(
-                        globalRoots, userRoot, out accessErrors, out followedFolders);
-
-                    List<string> watchPaths = CollectWatchPaths(globalRoots, userRoot, followedFolders);
-                    string userRootPath = userRoot.Path;
-
-                    _invokeHelper.BeginInvoke((Action)(() =>
-                    {
-                        ApplyNewMenu(tree);
-                        ReportAccessErrors(accessErrors, userRootPath);
-                        SyncWatchers(watchPaths);
-                    }));
+                    RebuildMenu();
                 }
-                catch (OperationCanceledException) { }
-                catch (Exception ex) { _invokeHelper.BeginInvoke((Action)(() => ShowBalloon("trutility error", ex.Message))); }
+                catch (Exception ex)
+                {
+                    _invokeHelper.BeginInvoke((Action)(() => ShowBalloon("trutility error", ex.Message)));
+                }
             }, token);
+        }
+
+        /// Resolves the folders, scans them, and hands the result back to the UI
+        /// thread. Runs entirely off the UI thread: a root may be unreachable.
+        private void RebuildMenu()
+        {
+            RootsLib.MigrateLegacyUserRoot();
+
+            IReadOnlyList<Root> globalRoots = RootsLib.GetGlobalRoots();
+            Root userRoot = RootsLib.GetUserRoot();
+            EnsureFoldersExist(globalRoots, userRoot);
+
+            List<string> accessErrors;
+            List<string> followedFolders;
+            MenuNode tree = MenuBuilder.BuildTree(
+                globalRoots, userRoot, out accessErrors, out followedFolders);
+
+            List<string> watchPaths = CollectWatchPaths(globalRoots, userRoot, followedFolders);
+            string userRootPath = userRoot.Path;
+
+            _invokeHelper.BeginInvoke((Action)(() =>
+            {
+                ApplyNewMenu(tree);
+                ReportAccessErrors(accessErrors, userRootPath);
+                SyncWatchers(watchPaths);
+            }));
         }
 
         /// <summary>
@@ -370,11 +403,11 @@ namespace trutility
 
         private void ApplyNewMenu(MenuNode tree)
         {
-            var newMenu = new ContextMenuStrip();
+            ContextMenuStrip newMenu = new ContextMenuStrip();
             PopulateMenu(newMenu.Items, tree);
             AddStaticItems(newMenu);
 
-            var old = _menu;
+            ContextMenuStrip old = _menu;
             _menu = newMenu;
             _notifyIcon.ContextMenuStrip = newMenu;
             old?.Dispose();
@@ -382,21 +415,11 @@ namespace trutility
 
         private void PopulateMenu(ToolStripItemCollection items, MenuNode node)
         {
-            foreach (var child in node.Children)
+            foreach (MenuNode child in node.Children)
             {
                 if (child.IsSeparator)
                 {
-                    // The thick rule marks the one boundary between
-                    // administrator-managed content and the folder belonging to
-                    // the user; thin rules part one global root from the next.
-                    if (child.IsSectionBoundary)
-                    {
-                        items.Add(new SectionDivider());
-                    }
-                    else
-                    {
-                        items.Add(new ToolStripSeparator());
-                    }
+                    items.Add(NewSeparator(child));
                     continue;
                 }
 
@@ -405,52 +428,11 @@ namespace trutility
 
                 if (child.IsFolder)
                 {
-                    if (child.Children.Count == 0) continue;
-
-                    var subMenu = new ToolStripMenuItem(child.Name);
-                    PopulateMenu(subMenu.DropDownItems, child);
-                    items.Add(subMenu);
+                    AddFolderItem(items, child);
                 }
                 else
                 {
-                    var filePath = child.FilePath;
-                    var item = new ToolStripMenuItem(child.Name);
-                    item.Image = IconsLib.GetIcon(filePath);
-
-                    // Normal left-click: launch
-                    // Ctrl+Click: delete from user folder (sent to Recycle Bin)
-                    // Shift+Click: Run As (ShellExecute "runas")
-                    item.MouseDown += (s, e) =>
-                    {
-                        if (e.Button == MouseButtons.Left)
-                        {
-                            if ((Control.ModifierKeys & Keys.Control) != 0)
-                            {
-                                // ── Ctrl+Click → delete ────────────────────
-                                TryDeleteUserFile(filePath);
-                                // Close the menu so the deleted item isn't still visible
-                                _menu?.Close();
-                                return;
-                            }
-                            if ((Control.ModifierKeys & Keys.Shift) != 0)
-                            {
-                                // ── Shift+Click → Run As ──────────────────
-                                LaunchFile(filePath, runas: true);
-                                _menu?.Close();
-                                return;
-                            }
-                        }
-                    };
-
-                    item.Click += (s, e) =>
-                    {
-                        // Guard: if a modifier was held the MouseDown handler
-                        // already acted; don't launch again.
-                        if ((Control.ModifierKeys & (Keys.Control | Keys.Shift)) == 0)
-                            LaunchFile(filePath, runas: false);
-                    };
-
-                    items.Add(item);
+                    items.Add(NewFileItem(child));
                 }
 
                 if (child.SeparatorAfter)
@@ -458,15 +440,77 @@ namespace trutility
             }
         }
 
+        /// The thick rule marks the one boundary between administrator-managed
+        /// content and the folder belonging to the user; thin rules part one
+        /// global root from the next.
+        private static ToolStripSeparator NewSeparator(MenuNode child)
+        {
+            if (child.IsSectionBoundary)
+            {
+                return new SectionDivider();
+            }
+            return new ToolStripSeparator();
+        }
+
+        private void AddFolderItem(ToolStripItemCollection items, MenuNode child)
+        {
+            if (child.Children.Count == 0) return;
+
+            ToolStripMenuItem subMenu = new ToolStripMenuItem(child.Name);
+            PopulateMenu(subMenu.DropDownItems, child);
+            items.Add(subMenu);
+        }
+
+        /// <summary>
+        /// Plain left-click launches. Ctrl+Click removes the file from the folder
+        /// belonging to the user, Shift+Click launches elevated. Both modifiers
+        /// act on MouseDown, so Click has to check that none was held or the file
+        /// would launch a second time.
+        /// </summary>
+        private ToolStripMenuItem NewFileItem(MenuNode child)
+        {
+            string filePath = child.FilePath;
+            ToolStripMenuItem item = new ToolStripMenuItem(child.Name)
+            {
+                Image = IconsLib.GetIcon(filePath),
+            };
+
+            item.MouseDown += (s, e) =>
+            {
+                if (e.Button != MouseButtons.Left) return;
+
+                if ((Control.ModifierKeys & Keys.Control) != 0)
+                {
+                    TryDeleteUserFile(filePath);
+                    _menu?.Close();   // so the deleted entry is not left on screen
+                    return;
+                }
+
+                if ((Control.ModifierKeys & Keys.Shift) != 0)
+                {
+                    LaunchFile(filePath, runas: true);
+                    _menu?.Close();
+                }
+            };
+
+            item.Click += (s, e) =>
+            {
+                if ((Control.ModifierKeys & (Keys.Control | Keys.Shift)) == 0)
+                    LaunchFile(filePath, runas: false);
+            };
+
+            return item;
+        }
+
         private void AddStaticItems(ContextMenuStrip menu)
         {
             menu.Items.Add(new ToolStripSeparator());
 
-            var about = new ToolStripMenuItem("About / Settings");
+            ToolStripMenuItem about = new ToolStripMenuItem("About / Settings");
             about.Click += OnAbout;
             menu.Items.Add(about);
 
-            var exit = new ToolStripMenuItem("Exit");
+            ToolStripMenuItem exit = new ToolStripMenuItem("Exit");
             exit.Click += (s, e) => Application.Exit();
             menu.Items.Add(exit);
         }
@@ -477,7 +521,7 @@ namespace trutility
         {
             try
             {
-                var psi = new ProcessStartInfo(path)
+                ProcessStartInfo psi = new ProcessStartInfo(path)
                 {
                     UseShellExecute = true,
                     Verb = runas ? "runas" : ""
@@ -523,14 +567,14 @@ namespace trutility
         {
             try
             {
-                var userRoot = UserRoot;
+                string userRoot = UserRoot;
                 Directory.CreateDirectory(userRoot);
 
-                var lnkName = Path.GetFileNameWithoutExtension(sourcePath) + ".lnk";
-                var dest = Path.Combine(userRoot, lnkName);
+                string lnkName = Path.GetFileNameWithoutExtension(sourcePath) + ".lnk";
+                string dest = Path.Combine(userRoot, lnkName);
 
                 // Create a proper shell shortcut via WScript.Shell progid at runtime
-                var wshType = Type.GetTypeFromProgID("WScript.Shell");
+                Type wshType = Type.GetTypeFromProgID("WScript.Shell");
                 if (wshType == null)
                     throw new InvalidOperationException("WScript.Shell is not available on this system.");
 
