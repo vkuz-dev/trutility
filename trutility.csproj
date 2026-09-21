@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <PropertyGroup>
+    <TargetFramework>net462-windows</TargetFramework>
+    <LangVersion>latestMajor</LangVersion>
+
+    <UseWindowsForms>true</UseWindowsForms>
+    <OutputType>WinExe</OutputType>
+
+    <Product>trutility</Product>
+    <Copyright>© 2026 Vladimirs Kuznecovs</Copyright>
+
+    <AssemblyName>trutility</AssemblyName>
+    <AssemblyTitle>trutility</AssemblyTitle>
+    
+    <RootNamespace>trutility</RootNamespace>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <!-- VERSIONING -->
+    <Version>1.4.1.0</Version>
+    <AssemblyVersion>$(Version)</AssemblyVersion>
+    <FileVersion>$(Version)</FileVersion>
+    <InformationalVersion>$(Version)</InformationalVersion>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <!-- BUILD -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Microsoft.VisualBasic" />
+  </ItemGroup>
+
+</Project>
