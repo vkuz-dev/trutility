@@ -240,7 +240,11 @@ namespace trutility
                     await Task.Delay(DebounceMs, token);
                     token.ThrowIfCancellationRequested();
 
-                    var tree = MenuBuilder.BuildTree(GlobalRoot, UserRoot, out var accessErrors, out var followedFolders);
+                    List<string> accessErrors;
+                    List<string> followedFolders;
+                    MenuNode tree = MenuBuilder.BuildTree(
+                        RootsLib.GetGlobalRoots(), RootsLib.GetUserRoot(),
+                        out accessErrors, out followedFolders);
 
                     _invokeHelper.BeginInvoke((Action)(() =>
                     {
@@ -283,7 +287,17 @@ namespace trutility
             {
                 if (child.IsSeparator)
                 {
-                    items.Add(new SectionDivider());
+                    // The thick rule marks the one boundary between
+                    // administrator-managed content and the folder belonging to
+                    // the user; thin rules part one global root from the next.
+                    if (child.IsSectionBoundary)
+                    {
+                        items.Add(new SectionDivider());
+                    }
+                    else
+                    {
+                        items.Add(new ToolStripSeparator());
+                    }
                     continue;
                 }
 
