@@ -407,6 +407,10 @@ namespace trutility
             PopulateMenu(newMenu.Items, tree);
             AddStaticItems(newMenu);
 
+            // The top level is the one part guaranteed to be shown, and it is
+            // still only filled when the menu opens rather than on every rebuild.
+            newMenu.Opening += (s, e) => FillIcons(newMenu.Items);
+
             ContextMenuStrip old = _menu;
             _menu = newMenu;
             _notifyIcon.ContextMenuStrip = newMenu;
@@ -458,7 +462,31 @@ namespace trutility
 
             ToolStripMenuItem subMenu = new ToolStripMenuItem(child.Name);
             PopulateMenu(subMenu.DropDownItems, child);
+            subMenu.DropDownOpening += (s, e) => FillIcons(subMenu.DropDownItems);
             items.Add(subMenu);
+        }
+
+        /// <summary>
+        /// Loads the icons for one menu level, just before it is shown.
+        ///
+        /// A shell icon lookup costs a millisecond or more per file, and the
+        /// whole tree used to be resolved while the menu was built — on the UI
+        /// thread, for every rebuild. That is seconds of freeze on a large
+        /// folder, nearly all of it spent on submenus nobody opened. Nothing can
+        /// be seen inside a closed submenu, so the work waits until it opens.
+        ///
+        /// DropDownOpening runs before the drop-down is displayed, so the images
+        /// are in place for the first paint and no layout shifts.
+        /// </summary>
+        private static void FillIcons(ToolStripItemCollection items)
+        {
+            foreach (ToolStripItem item in items)
+            {
+                string filePath = item.Tag as string;
+                if (filePath == null || item.Image != null) continue;
+
+                item.Image = IconsLib.GetIcon(filePath);
+            }
         }
 
         /// <summary>
@@ -470,9 +498,12 @@ namespace trutility
         private ToolStripMenuItem NewFileItem(MenuNode child)
         {
             string filePath = child.FilePath;
+
+            // The path rides along so FillIcons can resolve the image when this
+            // level of the menu is actually opened.
             ToolStripMenuItem item = new ToolStripMenuItem(child.Name)
             {
-                Image = IconsLib.GetIcon(filePath),
+                Tag = filePath,
             };
 
             item.MouseDown += (s, e) =>
