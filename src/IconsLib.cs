@@ -115,20 +115,37 @@ namespace trutility
             return fetched;
         }
 
+        /// <summary>
+        /// Forgets every cached icon, so the next lookup asks the shell again.
+        /// Items already on screen hold their own copies and are unaffected.
+        /// </summary>
+        public static void ClearCache()
+        {
+            lock (CacheLock)
+            {
+                DisposeAllLocked();
+            }
+        }
+
         private static void Store(string key, Bitmap value)
         {
             lock (CacheLock)
             {
                 if (Cache.Count >= MaxCacheEntries)
                 {
-                    foreach (Bitmap held in Cache.Values)
-                    {
-                        if (held != null) held.Dispose();
-                    }
-                    Cache.Clear();
+                    DisposeAllLocked();
                 }
                 Cache[key] = value;
             }
+        }
+
+        private static void DisposeAllLocked()
+        {
+            foreach (Bitmap held in Cache.Values)
+            {
+                if (held != null) held.Dispose();
+            }
+            Cache.Clear();
         }
 
         private static Bitmap Copy(Bitmap source)

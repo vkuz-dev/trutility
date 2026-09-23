@@ -11,28 +11,33 @@ namespace trutility
 {
     internal sealed class AboutDialog : Form
     {
-        public bool UserRootChanged { get; private set; }
+        /// Set once OK saves a change that affects what the menu shows.
+        public bool MenuNeedsRebuild { get; private set; }
 
+        private bool _userRootChanged;
         private string _userRoot;
 
         /// True when Change… picked a path, false when Reset asked to fall back.
-        /// Only meaningful while UserRootChanged is set.
+        /// Only meaningful while _userRootChanged is set.
         private bool _userRootExplicitlyChosen;
         private Label _userRootLabel;
         private CheckBox _chkShell;
         private CheckBox _chkStartup;
         private CheckBox _chkTrayPin;
+        private CheckBox _chkExtensions;
+        private readonly Action _refreshMenu;
 
-        public AboutDialog(Root userRoot)
+        public AboutDialog(Root userRoot, Action refreshMenu)
         {
             _userRoot = userRoot == null ? RootsLib.ResolveUserRootPath() : userRoot.Path;
+            _refreshMenu = refreshMenu;
 
             Text = "About trutility";
             FormBorderStyle = FormBorderStyle.Sizable;
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(700, 530);
+            ClientSize = new Size(700, 556);
             MinimumSize = new Size(600, 430);
 
             Controls.Add(BuildLayout());
@@ -152,7 +157,7 @@ namespace trutility
             GroupBox group = new GroupBox
             {
                 Text = "Settings",
-                Height = 112,
+                Height = 136,
                 Padding = new Padding(10, 6, 10, 6),
             };
 
@@ -169,13 +174,17 @@ namespace trutility
             _chkTrayPin = NewSetting(
                 "Pin icon to tray", SettingsTrayPin.IsPinEnabled(), trayPinManaged);
 
+            _chkExtensions = NewSetting(
+                "Show file extensions in the menu (shortcuts never show theirs)",
+                SettingsExtensions.IsShown(), SettingsExtensions.IsManagedByPolicy());
+
             FlowLayoutPanel stack = new FlowLayoutPanel
             {
                 Dock = DockStyle.Fill,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
             };
-            stack.Controls.AddRange(new Control[] { _chkShell, _chkStartup, _chkTrayPin });
+            stack.Controls.AddRange(new Control[] { _chkShell, _chkStartup, _chkTrayPin, _chkExtensions });
             group.Controls.Add(stack);
             return group;
         }
@@ -223,12 +232,16 @@ namespace trutility
             return group;
         }
 
+        /// Refresh sits on the left, apart from OK and Cancel: it acts at once
+        /// and is not part of saving or discarding the dialog.
         private Control BuildButtonRow()
         {
-            FlowLayoutPanel row = new FlowLayoutPanel
+            FlowLayoutPanel dialogButtons = new FlowLayoutPanel
             {
-                Height = 34,
+                Dock = DockStyle.Right,
+                AutoSize = true,
                 FlowDirection = FlowDirection.RightToLeft,
+                WrapContents = false,
             };
 
             Button ok = new Button { Text = "OK", AutoSize = true, MinimumSize = new Size(80, 26) };
@@ -242,10 +255,52 @@ namespace trutility
                 DialogResult = DialogResult.Cancel,
             };
 
-            row.Controls.AddRange(new Control[] { ok, cancel });
+            dialogButtons.Controls.AddRange(new Control[] { ok, cancel });
             AcceptButton = ok;
             CancelButton = cancel;
+
+            // In a flow panel of its own, like OK and Cancel, so it gets the
+            // same size and margins instead of stretching to the row height.
+            FlowLayoutPanel toolButtons = new FlowLayoutPanel
+            {
+                Dock = DockStyle.Left,
+                AutoSize = true,
+                WrapContents = false,
+            };
+            toolButtons.Controls.Add(BuildRefreshButton());
+
+            Panel row = new Panel { Height = 34 };
+            row.Controls.Add(dialogButtons);
+            row.Controls.Add(toolButtons);
             return row;
+        }
+
+        /// <summary>
+        /// Rescans every folder and reloads every icon. Rarely needed — changes
+        /// are picked up on their own — but a share that was offline is only
+        /// re-checked every few minutes, and an updated program can keep its old
+        /// icon until the cache is cleared.
+        /// </summary>
+        private Button BuildRefreshButton()
+        {
+            Button refresh = new Button
+            {
+                Text = "Refresh menu",
+                AutoSize = true,
+                MinimumSize = new Size(100, 26),
+                Enabled = _refreshMenu != null,
+            };
+
+            refresh.Click += (s, e) =>
+            {
+                _refreshMenu();
+
+                // The rebuild runs in the background and finishes in moments;
+                // this is just so the click visibly did something.
+                refresh.Text = "Menu refreshed";
+                refresh.Enabled = false;
+            };
+            return refresh;
         }
 
 
@@ -262,11 +317,20 @@ namespace trutility
             if (_chkTrayPin.Enabled)
                 SettingsTrayPin.SaveTrayPin(_chkTrayPin.Checked);
 
+            // Only written when it actually changed: saving the default would
+            // pin it in HKCU and shadow any policy an administrator sets later.
+            if (_chkExtensions.Enabled && _chkExtensions.Checked != SettingsExtensions.IsShown())
+            {
+                SettingsExtensions.Save(_chkExtensions.Checked);
+                MenuNeedsRebuild = true;
+            }
+
             // Reset means "drop my choice and fall back", not "pin the path the
             // fallback currently resolves to" — writing it back would make the
             // default permanent and survive a later policy change.
-            if (UserRootChanged)
+            if (_userRootChanged)
             {
+                MenuNeedsRebuild = true;
                 if (_userRootExplicitlyChosen)
                 {
                     RootsLib.SetUserRoot(_userRoot);
@@ -293,7 +357,7 @@ namespace trutility
                 _userRoot = dlg.SelectedPath;
                 _userRootLabel.Text = _userRoot;
                 _userRootExplicitlyChosen = true;
-                UserRootChanged = true;
+                _userRootChanged = true;
             }
         }
 
@@ -305,7 +369,7 @@ namespace trutility
             _userRoot = RootsLib.ResolveDefaultUserRootPath();
             _userRootLabel.Text = _userRoot;
             _userRootExplicitlyChosen = false;
-            UserRootChanged = true;
+            _userRootChanged = true;
         }
 
         private static void OpenFolder(string path, bool createIfMissing)

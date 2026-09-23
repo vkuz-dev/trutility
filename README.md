@@ -43,7 +43,7 @@ About / Settings
 Exit
 ```
 
-`.lnk` and `.url` lose their extension in the menu, since the shortcut is not the point. Everything else keeps its name as-is — `eventvwr.msc` shows as `eventvwr.msc`.
+`.lnk` and `.url` always lose their extension in the menu, since the shortcut is not the point. Other files show theirs — `eventvwr.msc` stays `eventvwr.msc` — unless extensions are turned off in Settings. Folder names are never cut at a dot.
 
 Within each folder, files are listed before subfolders, parted by a thin line. `desktop.ini` and `thumbs.db` are ignored; everything else becomes an entry.
 
@@ -90,7 +90,9 @@ Right-click the tray icon → **About / Settings**:
 - **Add to trutility in Explorer context menu** — right-click any file or folder to drop a shortcut into your folder
 - **Run at startup**
 - **Pin icon to tray**
+- **Show file extensions in the menu** — on by default
 - **Your folder** — change its location, reset it, or open it
+- **Refresh menu** — rescans every folder and reloads every icon. Changes are normally picked up on their own; this is for when they aren't, such as a share that just came back online or a program updated in place that still shows its old icon.
 
 Any setting an administrator has decided is shown as *[Managed by Administrator]* and greyed out.
 
@@ -172,6 +174,7 @@ Under `HKLM\SOFTWARE\trutility`:
 | `UserRoot` | `REG_SZ` | Pins **where** the user's own folder lives. What goes in it is still theirs alone. |
 | `AddToShell` | `REG_DWORD` | Explorer context-menu entry on or off. |
 | `PinToTray` | `REG_DWORD` | Tray icon pinned or not. |
+| `ShowExtensions` | `REG_DWORD` | File extensions shown in the menu or not. |
 
 These apply to anyone who has not already changed the setting themselves — the dialog then shows it greyed out as managed. **A user who changed it before the policy arrived keeps their own choice**, because the matching `HKCU` value shadows `HKLM`. To re-assert one, delete it from `HKCU\SOFTWARE\trutility` as well.
 

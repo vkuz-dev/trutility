@@ -340,7 +340,8 @@ namespace trutility
             List<string> accessErrors;
             List<string> followedFolders;
             MenuNode tree = MenuBuilder.BuildTree(
-                globalRoots, userRoot, out accessErrors, out followedFolders);
+                globalRoots, userRoot, out accessErrors, out followedFolders,
+                SettingsExtensions.IsShown());
 
             List<string> watchPaths = CollectWatchPaths(globalRoots, userRoot, followedFolders);
             string userRootPath = userRoot.Path;
@@ -670,15 +671,29 @@ namespace trutility
 
         private void OnAbout(object sender, EventArgs e)
         {
-            using (AboutDialog dlg = new AboutDialog(RootsLib.GetUserRoot()))
+            using (AboutDialog dlg = new AboutDialog(RootsLib.GetUserRoot(), RefreshMenu))
             {
                 dlg.ShowDialog();
-                // The rebuild creates the folder and re-points the watchers.
-                if (dlg.UserRootChanged)
+                // A new folder location or a display change both need a rebuild;
+                // for a new location it also creates the folder and re-points
+                // the watchers.
+                if (dlg.MenuNeedsRebuild)
                 {
                     BuildMenuAsync();
                 }
             }
+        }
+
+        /// <summary>
+        /// A full refresh: rescan every folder and forget every cached icon.
+        /// Watchers make this rarely necessary, so the usual reason to ask is
+        /// something they could not see — a share that came back online, or a
+        /// program updated in place whose old icon is still cached.
+        /// </summary>
+        private void RefreshMenu()
+        {
+            IconsLib.ClearCache();
+            BuildMenuAsync();
         }
 
         // ── FileSystemWatcher ─────────────────────────────────────────────────

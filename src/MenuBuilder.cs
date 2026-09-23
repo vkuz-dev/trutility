@@ -81,15 +81,17 @@ namespace trutility
             };
 
         /// <summary>
-        /// State threaded through one scan. ForeignRoots carries the other roots
-        /// so a $F shortcut cannot reach across a root boundary.
+        /// State threaded through one build. ForeignRoots is set per root as each
+        /// one is scanned, so a $F shortcut cannot reach across a root boundary.
         /// </summary>
         private sealed class ScanContext
         {
             public List<string> AccessErrors;
             public List<string> FollowedFolders;
             public HashSet<string> VisitedFolders;
+            public IReadOnlyList<Root> AllRoots;
             public IReadOnlyList<string> ForeignRoots;
+            public bool ShowExtensions;
         }
 
         /// <summary>
@@ -107,24 +109,32 @@ namespace trutility
         /// marks where administrator-managed content ends.
         /// </summary>
         public static MenuNode BuildTree(IReadOnlyList<Root> globalRoots, Root userRoot,
-                                         out List<string> accessErrors, out List<string> followedFolders)
+                                         out List<string> accessErrors, out List<string> followedFolders,
+                                         bool showExtensions = true)
         {
-            accessErrors = new List<string>();
-            followedFolders = new List<string>();
-
             List<Root> allRoots = new List<Root>(globalRoots ?? new Root[0]);
             if (userRoot != null)
             {
                 allRoots.Add(userRoot);
             }
 
-            HashSet<string> visited = SeedVisitedFolders(allRoots);
+            ScanContext context = new ScanContext
+            {
+                AccessErrors = new List<string>(),
+                FollowedFolders = new List<string>(),
+                VisitedFolders = SeedVisitedFolders(allRoots),
+                AllRoots = allRoots,
+                ShowExtensions = showExtensions,
+            };
+            accessErrors = context.AccessErrors;
+            followedFolders = context.FollowedFolders;
+
             MenuNode root = new MenuNode("root", false, false);
             bool anyGlobal = false;
 
             foreach (Root globalRoot in allRoots.Where(r => r.Scope == RootScope.Global))
             {
-                MenuNode section = ScanRoot(globalRoot, allRoots, visited, accessErrors, followedFolders);
+                MenuNode section = ScanRoot(globalRoot, context);
                 if (section == null)
                 {
                     continue;
@@ -138,21 +148,19 @@ namespace trutility
                 anyGlobal = true;
             }
 
-            AppendUserSection(root, userRoot, allRoots, visited, accessErrors, followedFolders,
-                              anyGlobal);
+            AppendUserSection(root, userRoot, context, anyGlobal);
             return root;
         }
 
-        private static void AppendUserSection(MenuNode root, Root userRoot, List<Root> allRoots,
-                                              HashSet<string> visited, List<string> accessErrors,
-                                              List<string> followedFolders, bool anyGlobal)
+        private static void AppendUserSection(MenuNode root, Root userRoot, ScanContext context,
+                                              bool anyGlobal)
         {
             if (userRoot == null)
             {
                 return;
             }
 
-            MenuNode section = ScanRoot(userRoot, allRoots, visited, accessErrors, followedFolders);
+            MenuNode section = ScanRoot(userRoot, context);
             if (section == null)
             {
                 return;
@@ -185,22 +193,16 @@ namespace trutility
 
         /// Returns the populated section, or null when the root is unreachable
         /// or contributes nothing.
-        private static MenuNode ScanRoot(Root root, IReadOnlyList<Root> allRoots,
-                                         HashSet<string> visited, List<string> accessErrors,
-                                         List<string> followedFolders)
+        private static MenuNode ScanRoot(Root root, ScanContext context)
         {
             if (string.IsNullOrWhiteSpace(root.Path) || !Directory.Exists(root.Path))
             {
                 return null;
             }
 
-            ScanContext context = new ScanContext
-            {
-                AccessErrors = accessErrors,
-                FollowedFolders = followedFolders,
-                VisitedFolders = visited,
-                ForeignRoots = ForeignRootPaths(root, allRoots),
-            };
+            // Roots are scanned one after another, so the context can carry the
+            // boundaries of whichever root is being scanned right now.
+            context.ForeignRoots = ForeignRootPaths(root, context.AllRoots);
 
             MenuNode section = new MenuNode(SectionName(root), false, false);
             ScanIntoTree(section, root.Path, context);
@@ -306,7 +308,7 @@ namespace trutility
                         continue;
                     }
 
-                    ParsedName parsed = ParseName(fileName, isFolder: false);
+                    ParsedName parsed = ParseName(fileName, isFolder: false, context.ShowExtensions);
 
                     // $X on a shortcut implies $F: promoting the children of a
                     // target means following it first, so it never needs both.
@@ -345,7 +347,7 @@ namespace trutility
                 foreach (string subDir in Directory.GetDirectories(directory)
                              .OrderBy(d => Path.GetFileName(d), StringComparer.OrdinalIgnoreCase))
                 {
-                    ParsedName parsed = ParseName(Path.GetFileName(subDir), isFolder: true);
+                    ParsedName parsed = ParseName(Path.GetFileName(subDir), isFolder: true, context.ShowExtensions);
                     MenuNode folderNode =
                         new MenuNode(parsed.DisplayName, parsed.SepBefore, parsed.SepAfter)
                         {
@@ -434,7 +436,7 @@ namespace trutility
         /// marker is checked both before and after the separator suffix so
         /// either ordering works (e.g. "Name$F$^.lnk" or "Name$^$F.lnk").
         /// </summary>
-        private static ParsedName ParseName(string raw, bool isFolder)
+        private static ParsedName ParseName(string raw, bool isFolder, bool showExtensions)
         {
             // A folder name is never split on a dot: "Finance.2026$X" is a folder
             // called "Finance.2026", not one called "Finance" with an extension.
@@ -467,7 +469,9 @@ namespace trutility
                 flatten = TryStripSuffix(ref stem, "$X");
             }
 
-            string displayExt = LinkExtensions.Contains(ext) ? "" : ext;
+            // A shortcut never shows its extension; everything else follows the
+            // setting.
+            string displayExt = !showExtensions || LinkExtensions.Contains(ext) ? "" : ext;
 
             return new ParsedName
             {
