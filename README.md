@@ -57,8 +57,19 @@ Append to a **file or folder name**:
 | `$_` | separator below |
 | `$^_` | separators on both sides |
 | `$F` | on a `.lnk` or `.url`: expand the target folder as a submenu instead of showing the shortcut |
+| `$X` | show a folder's contents in its place — the folder itself never appears |
 
 Example: `putty$^_.lnk` gets a separator on each side.
+
+`$X` is how you keep a folder on disk without it showing up in the menu:
+
+```
+Tools$X\                          server1
+    server1.lnk         becomes   ─────────
+    Remote\                       Remote   ▶
+```
+
+Its children land exactly where the folder would have, keeping their own order. To collapse two levels, mark both — `Tools$X\Remote$X\`. On a `.lnk` or `.url` it implies `$F`, so `Finance$X.lnk` drops the target folder's contents straight into the menu without a `Finance` submenu around them.
 
 A `$F` shortcut shows nothing at all — rather than a dead entry — when its target is unreachable, denied, or already on the menu. It cannot reach into another watched folder, so it can never pull shared tools across the line into your own section.
 

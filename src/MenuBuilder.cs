@@ -18,11 +18,13 @@ namespace trutility
         /// so exactly one of these appears in a menu.
         public bool IsSectionBoundary { get; }
 
-        private readonly Dictionary<string, MenuNode> _childIndex =
-            new Dictionary<string, MenuNode>(StringComparer.OrdinalIgnoreCase);
-        private readonly List<MenuNode> _childOrder = new List<MenuNode>();
+        /// Marked $X: this folder is a container on disk only. It is never shown
+        /// itself — its children take its place in the parent menu.
+        public bool IsFlattened { get; set; }
 
-        public IReadOnlyList<MenuNode> Children => _childOrder;
+        private readonly List<MenuNode> _children = new List<MenuNode>();
+
+        public IReadOnlyList<MenuNode> Children => _children;
         public bool IsFolder => FilePath == null && !IsSeparator;
 
         public MenuNode(string name, bool separatorBefore, bool separatorAfter,
@@ -35,28 +37,20 @@ namespace trutility
             IsSectionBoundary = isSectionBoundary;
         }
 
-        public void AddChild(string key, MenuNode node)
+        /// <summary>
+        /// Appends. There is deliberately no keyed replace.
+        ///
+        /// Children used to be held in a dictionary as well as a list, so adding
+        /// one whose key already existed replaced it in place. Nothing ever
+        /// looked a child up by key — the index only existed to power that
+        /// replacement, and the replacement only ever lost entries: two folders
+        /// called "Tools" from different places are two entries, and making that
+        /// impossible to get wrong is the whole point of keeping them separate.
+        /// </summary>
+        public void AddChild(MenuNode node)
         {
-            if (_childIndex.ContainsKey(key))
-            {
-                int idx = _childOrder.IndexOf(_childIndex[key]);
-                _childOrder[idx] = node;
-            }
-            else
-            {
-                _childOrder.Add(node);
-            }
-            _childIndex[key] = node;
+            _children.Add(node);
         }
-
-        public void ClearChildren()
-        {
-            _childIndex.Clear();
-            _childOrder.Clear();
-        }
-
-        public bool TryGetChild(string key, out MenuNode node) =>
-            _childIndex.TryGetValue(key, out node);
 
         /// Separates one global root from the next.
         public static MenuNode NewThinDivider() =>
@@ -102,10 +96,10 @@ namespace trutility
         /// Builds the menu from the administrator-managed global roots followed
         /// by the folder belonging to the user.
         ///
-        /// Roots never merge. Every root is keyed into its own namespace, so a
-        /// "Tools" folder present in two roots yields two independent entries
-        /// instead of one silently replacing the other. There is no
-        /// collision-resolution and no notion of one root winning over another.
+        /// Roots never merge. A "Tools" folder present in two roots yields two
+        /// independent entries: children are only ever appended, so one can
+        /// never replace another. There is no collision-resolution anywhere and
+        /// no notion of one root winning over another.
         ///
         /// A root carrying a Label nests under a submenu of that name; without
         /// one its contents splice in at top level. Consecutive global roots are
@@ -126,7 +120,6 @@ namespace trutility
 
             HashSet<string> visited = SeedVisitedFolders(allRoots);
             MenuNode root = new MenuNode("root", false, false);
-            int dividerSeq = 0;
             bool anyGlobal = false;
 
             foreach (Root globalRoot in allRoots.Where(r => r.Scope == RootScope.Global))
@@ -139,21 +132,20 @@ namespace trutility
 
                 if (anyGlobal)
                 {
-                    root.AddChild(DividerKey(dividerSeq++), MenuNode.NewThinDivider());
+                    root.AddChild(MenuNode.NewThinDivider());
                 }
                 AppendSection(root, globalRoot, section);
                 anyGlobal = true;
             }
 
             AppendUserSection(root, userRoot, allRoots, visited, accessErrors, followedFolders,
-                              anyGlobal, ref dividerSeq);
+                              anyGlobal);
             return root;
         }
 
         private static void AppendUserSection(MenuNode root, Root userRoot, List<Root> allRoots,
                                               HashSet<string> visited, List<string> accessErrors,
-                                              List<string> followedFolders, bool anyGlobal,
-                                              ref int dividerSeq)
+                                              List<string> followedFolders, bool anyGlobal)
         {
             if (userRoot == null)
             {
@@ -168,7 +160,7 @@ namespace trutility
 
             if (anyGlobal)
             {
-                root.AddChild(DividerKey(dividerSeq++), MenuNode.NewSectionBoundary());
+                root.AddChild(MenuNode.NewSectionBoundary());
             }
             AppendSection(root, userRoot, section);
         }
@@ -228,30 +220,22 @@ namespace trutility
             string.IsNullOrWhiteSpace(root.Label) ? root.Name : root.Label;
 
         /// <summary>
-        /// Splices a scanned root into the menu under keys unique to that root.
-        /// Without the prefix, AddChild would replace a same-named entry from an
-        /// earlier root in place and the entry would vanish.
+        /// Adds a scanned root to the menu: as one submenu when it carries a
+        /// Label, otherwise by splicing its contents in at the top level.
         /// </summary>
         private static void AppendSection(MenuNode target, Root root, MenuNode section)
         {
-            string prefix = root.Scope + ":" + root.Name + ":";
-
             if (!string.IsNullOrWhiteSpace(root.Label))
             {
-                target.AddChild(prefix, section);
+                target.AddChild(section);
                 return;
             }
 
             foreach (MenuNode child in section.Children)
             {
-                target.AddChild(prefix + ChildKey(child), child);
+                target.AddChild(child);
             }
         }
-
-        private static string ChildKey(MenuNode child) =>
-            (child.IsFolder ? "folder:" : "file:") + child.Name;
-
-        private static string DividerKey(int sequence) => "~~~divider~~~" + sequence;
 
         private static void ScanIntoTree(MenuNode node, string directory, ScanContext context)
         {
@@ -266,20 +250,46 @@ namespace trutility
             folderNodes = folderNodes.OrderBy(n => n.Name, StringComparer.OrdinalIgnoreCase).ToList();
 
             // ── Populate node: files → [divider] → folders ────────────────────
-            foreach (MenuNode f in fileNodes)
-            {
-                node.AddChild(ChildKey(f), f);
-            }
+            List<MenuNode> rendered = new List<MenuNode>();
+            rendered.AddRange(fileNodes);
 
-            if (fileNodes.Count > 0 && folderNodes.Count > 0)
-            {
-                folderNodes[0].SeparatorBefore = true;
-            }
-
+            int firstFolder = rendered.Count;
             foreach (MenuNode d in folderNodes)
             {
-                node.AddChild(ChildKey(d), d);
+                AppendFolder(rendered, d);
             }
+
+            // The rule is "a divider between files and folders", so it belongs on
+            // whatever ends up first among them — which for a flattened folder is
+            // one of its promoted children, not the folder itself.
+            if (fileNodes.Count > 0 && rendered.Count > firstFolder)
+            {
+                rendered[firstFolder].SeparatorBefore = true;
+            }
+
+            foreach (MenuNode child in rendered)
+            {
+                node.AddChild(child);
+            }
+        }
+
+        /// <summary>
+        /// Adds a folder, or — when it is marked $X — the children it stands in
+        /// for, at the position the folder itself would have taken.
+        ///
+        /// Promoted children are keyed under the folder they came from, so a
+        /// name that already exists alongside them stays a separate entry. The
+        /// same rule as everywhere else: nothing merges.
+        /// </summary>
+        private static void AppendFolder(List<MenuNode> rendered, MenuNode folder)
+        {
+            if (!folder.IsFlattened)
+            {
+                rendered.Add(folder);
+                return;
+            }
+
+            rendered.AddRange(folder.Children);
         }
 
         private static void ScanFiles(string directory, ScanContext context,
@@ -296,9 +306,12 @@ namespace trutility
                         continue;
                     }
 
-                    ParsedName parsed = ParseName(fileName);
+                    ParsedName parsed = ParseName(fileName, isFolder: false);
 
-                    if (parsed.Follow && LinkExtensions.Contains(Path.GetExtension(fileName)))
+                    // $X on a shortcut implies $F: promoting the children of a
+                    // target means following it first, so it never needs both.
+                    if ((parsed.Follow || parsed.Flatten)
+                        && LinkExtensions.Contains(Path.GetExtension(fileName)))
                     {
                         // A $F link is a folder expansion, not an entry. When the
                         // target cannot be expanded — offline share, denied ACL,
@@ -332,8 +345,12 @@ namespace trutility
                 foreach (string subDir in Directory.GetDirectories(directory)
                              .OrderBy(d => Path.GetFileName(d), StringComparer.OrdinalIgnoreCase))
                 {
-                    ParsedName parsed = ParseName(Path.GetFileName(subDir));
-                    MenuNode folderNode = new MenuNode(parsed.DisplayName, parsed.SepBefore, parsed.SepAfter);
+                    ParsedName parsed = ParseName(Path.GetFileName(subDir), isFolder: true);
+                    MenuNode folderNode =
+                        new MenuNode(parsed.DisplayName, parsed.SepBefore, parsed.SepAfter)
+                        {
+                            IsFlattened = parsed.Flatten,
+                        };
 
                     ScanIntoTree(folderNode, subDir, context);
 
@@ -380,7 +397,10 @@ namespace trutility
                 return null;
             }
 
-            MenuNode node = new MenuNode(parsed.DisplayName, parsed.SepBefore, parsed.SepAfter);
+            MenuNode node = new MenuNode(parsed.DisplayName, parsed.SepBefore, parsed.SepAfter)
+            {
+                IsFlattened = parsed.Flatten,
+            };
             ScanIntoTree(node, target, context);
             context.FollowedFolders.Add(target);
 
@@ -405,6 +425,7 @@ namespace trutility
             public bool SepBefore;
             public bool SepAfter;
             public bool Follow;
+            public bool Flatten;
         }
 
         /// <summary>
@@ -413,12 +434,16 @@ namespace trutility
         /// marker is checked both before and after the separator suffix so
         /// either ordering works (e.g. "Name$F$^.lnk" or "Name$^$F.lnk").
         /// </summary>
-        private static ParsedName ParseName(string raw)
+        private static ParsedName ParseName(string raw, bool isFolder)
         {
-            string ext = Path.GetExtension(raw);
-            string stem = Path.GetFileNameWithoutExtension(raw);
+            // A folder name is never split on a dot: "Finance.2026$X" is a folder
+            // called "Finance.2026", not one called "Finance" with an extension.
+            // Splitting it hid every marker behind the dot.
+            string ext = isFolder ? "" : Path.GetExtension(raw);
+            string stem = isFolder ? raw : Path.GetFileNameWithoutExtension(raw);
 
             bool follow = TryStripSuffix(ref stem, "$F");
+            bool flatten = TryStripSuffix(ref stem, "$X");
 
             bool both = stem.EndsWith("$^_") || stem.EndsWith("$_^");
             bool before = both || stem.EndsWith("$^");
@@ -437,6 +462,10 @@ namespace trutility
             {
                 follow = TryStripSuffix(ref stem, "$F");
             }
+            if (!flatten)
+            {
+                flatten = TryStripSuffix(ref stem, "$X");
+            }
 
             string displayExt = LinkExtensions.Contains(ext) ? "" : ext;
 
@@ -445,7 +474,8 @@ namespace trutility
                 DisplayName = stem.Trim() + displayExt,
                 SepBefore = before,
                 SepAfter = after,
-                Follow = follow
+                Follow = follow,
+                Flatten = flatten
             };
         }
 

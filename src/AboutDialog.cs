@@ -32,7 +32,7 @@ namespace trutility
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(700, 470);
+            ClientSize = new Size(700, 530);
             MinimumSize = new Size(600, 430);
 
             Controls.Add(BuildLayout());
@@ -196,7 +196,7 @@ namespace trutility
             GroupBox group = new GroupBox
             {
                 Text = "Menu organization",
-                Height = 104,
+                Height = 160,
                 Padding = new Padding(10, 6, 10, 6),
             };
 
@@ -209,11 +209,15 @@ namespace trutility
                 Text =
                     "Shared tools sit above the thicker line, your own below it.\n" +
                     "Folders with the same name stay separate instead of merging.\n\n" +
-                    "Append to a filename:     " +
-                    "$^  separator above     $_  separator below     " +
-                    "$^_  both sides     $F  expand shortcut as a submenu\n" +
-                    "On any menu item:         " +
-                    "Ctrl + Click  remove from your folder (Recycle Bin)     " +
+                    // Each marker on its own line with a plain indent, rather
+                    // than columns padded with spaces — those drift apart at a
+                    // different DPI or font size.
+                    "Append to a name:\n" +
+                    "    $^  separator above      $_  separator below      $^_  both sides\n" +
+                    "    $F  expand a shortcut as a submenu\n" +
+                    "    $X  show a folder's contents in its place, without the folder\n\n" +
+                    "On any menu item:\n" +
+                    "    Ctrl + Click  remove from your folder (Recycle Bin)      " +
                     "Shift + Click  run as Administrator",
             });
             return group;
