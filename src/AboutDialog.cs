@@ -34,54 +34,72 @@ namespace trutility
             _refreshMenu = refreshMenu;
 
             Text = "About trutility";
-            FormBorderStyle = FormBorderStyle.Sizable;
+            FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(700, 580);
-            MinimumSize = new Size(600, 430);
+
+            // The window is exactly as big as what is in it. Fixed sizes had to
+            // be raised by hand every time a setting or a line of help was
+            // added, and clipped the dialog whenever one was missed; they also
+            // ignored display scaling, which sizing to content follows for free.
+            AutoSize = true;
+            AutoSizeMode = AutoSizeMode.GrowAndShrink;
 
             Controls.Add(BuildLayout());
         }
 
         /// <summary>
-        /// Everything here is something the user can act on, so every section
-        /// sizes to its content and a spacer takes any slack. That keeps the
-        /// buttons on the bottom edge when the window is resized.
+        /// One column of sections, each as tall as its contents. The column is
+        /// as wide as the widest section, and every section stretches to it so
+        /// their edges line up.
         /// </summary>
         private TableLayoutPanel BuildLayout()
         {
-            TableLayoutPanel layout = new TableLayoutPanel
-            {
-                Dock = DockStyle.Fill,
-                ColumnCount = 1,
-                RowCount = 6,
-                Padding = new Padding(12),
-            };
-            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
-
             Control[] rows =
             {
                 BuildHeader(),
                 BuildUserGroup(),
                 BuildSettingsGroup(),
                 BuildHelpGroup(),
-                new Panel { Height = 0 },   // spacer
                 BuildButtonRow(),
             };
-            Control spacer = rows[4];
 
-            foreach (Control row in rows)
+            TableLayoutPanel layout = new TableLayoutPanel
             {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                RowCount = rows.Length,
+                Padding = new Padding(12),
+            };
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
+
+            for (int i = 0; i < rows.Length; i++)
+            {
+                Control row = rows[i];
                 row.Dock = DockStyle.Fill;
-                row.Margin = new Padding(0, 0, 0, row == spacer ? 0 : 10);
-                layout.RowStyles.Add(row == spacer
-                    ? new RowStyle(SizeType.Percent, 100f)
-                    : new RowStyle(SizeType.AutoSize));
-                layout.Controls.Add(row);
+                row.Margin = new Padding(0, 0, 0, i == rows.Length - 1 ? 0 : 10);
+                layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+                layout.Controls.Add(row, 0, i);
             }
 
             return layout;
+        }
+
+        /// A titled section that grows to fit what is put in it.
+        private static GroupBox NewGroup(string title, Control content)
+        {
+            GroupBox group = new GroupBox
+            {
+                Text = title,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Padding = new Padding(10, 6, 10, 8),
+            };
+            content.Dock = DockStyle.Fill;
+            group.Controls.Add(content);
+            return group;
         }
 
         // ── Sections ──────────────────────────────────────────────────────────
@@ -103,30 +121,39 @@ namespace trutility
         private Control BuildUserGroup()
         {
             bool managed = TrayApplication.IsUserRootManagedByPolicy();
-            GroupBox group = new GroupBox
-            {
-                // Policy may decide where this folder lives. What goes in it is
-                // the user's alone, so nothing here is ever disabled by content.
-                Text = managed
-                    ? "Your folder — location set by your administrator"
-                    : "Your folder",
-                Height = 86,
-                Padding = new Padding(10, 6, 10, 10),
-            };
 
+            // The path is the one thing that must not set the width: a deep
+            // folder would stretch the whole dialog. It asks for 1px, fills
+            // whatever width the other sections settle on, and trails off
+            // with "…" when it does not fit.
             _userRootLabel = new Label
             {
                 Text = _userRoot,
-                Dock = DockStyle.Top,
+                AutoSize = false,
+                AutoEllipsis = true,
+                Width = 1,
                 Height = 20,
+                Dock = DockStyle.Fill,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Font = new Font("Consolas", 8f),
-                AutoEllipsis = true,
             };
 
-            group.Controls.Add(_userRootLabel);
-            group.Controls.Add(BuildUserButtons(managed));
-            return group;
+            TableLayoutPanel content = new TableLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 1,
+                RowCount = 2,
+            };
+            content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            content.Controls.Add(_userRootLabel, 0, 0);
+            content.Controls.Add(BuildUserButtons(managed), 0, 1);
+
+            // Policy may decide where this folder lives. What goes in it is the
+            // user's alone, so nothing here is ever disabled by content.
+            return NewGroup(
+                managed ? "Your folder — location set by your administrator" : "Your folder",
+                content);
         }
 
         /// Change… and Reset follow the location policy; Open never does, because
@@ -135,9 +162,10 @@ namespace trutility
         {
             FlowLayoutPanel buttons = new FlowLayoutPanel
             {
-                Dock = DockStyle.Bottom,
-                Height = 32,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
             };
 
             Button change = new Button { Text = "Change…", AutoSize = true, Enabled = !managed };
@@ -155,13 +183,6 @@ namespace trutility
 
         private Control BuildSettingsGroup()
         {
-            GroupBox group = new GroupBox
-            {
-                Text = "Settings",
-                Height = 160,
-                Padding = new Padding(10, 6, 10, 6),
-            };
-
             bool shellManaged = TrayApplication.IsShellVerbManagedByPolicy();
             _chkShell = NewSetting(
                 "Enable \"Add to trutility\" in Explorer context menu",
@@ -176,16 +197,17 @@ namespace trutility
                 "Pin icon to tray", SettingsTrayPin.IsPinEnabled(), trayPinManaged);
 
             _chkExtensions = NewSetting(
-                "Show file extensions in the menu (shortcuts never show theirs)",
+                "Show file extensions",
                 ToggleSetting.ShowExtensions.IsOn(), ToggleSetting.ShowExtensions.IsManagedByPolicy());
 
             _chkFocusSearch = NewSetting(
-                "Put the cursor in the search box when the menu opens",
+                "Focus search box by default",
                 ToggleSetting.FocusSearch.IsOn(), ToggleSetting.FocusSearch.IsManagedByPolicy());
 
             FlowLayoutPanel stack = new FlowLayoutPanel
             {
-                Dock = DockStyle.Fill,
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
             };
@@ -193,8 +215,7 @@ namespace trutility
             {
                 _chkShell, _chkStartup, _chkTrayPin, _chkExtensions, _chkFocusSearch,
             });
-            group.Controls.Add(stack);
-            return group;
+            return NewGroup("Settings", stack);
         }
 
         private static CheckBox NewSetting(string text, bool value, bool managed)
@@ -210,16 +231,9 @@ namespace trutility
 
         private static Control BuildHelpGroup()
         {
-            GroupBox group = new GroupBox
+            Label help = new Label
             {
-                Text = "Menu organization",
-                Height = 160,
-                Padding = new Padding(10, 6, 10, 6),
-            };
-
-            group.Controls.Add(new Label
-            {
-                Dock = DockStyle.Fill,
+                AutoSize = true,
                 // Explains the divider the user can see, without a lecture on
                 // where the entries above it came from — that is not theirs to
                 // manage and knowing would not help them.
@@ -232,12 +246,13 @@ namespace trutility
                     "Append to a name:\n" +
                     "    $^  separator above      $_  separator below      $^_  both sides\n" +
                     "    $F  a shortcut to a folder opens as a submenu, like the folder itself\n" +
-                    "    $X  a folder (or shortcut to one) is replaced by its contents\n\n" +
+                    "    $X  a folder (or shortcut to one) is replaced by its contents, aka - unpack here\n\n" +
+                    "    Example: reports$F$^.lnk  →  a folder named \"reports\" shown as a submenu with a separator above.\n\n" +
                     "On any menu item:\n" +
                     "    Ctrl + Click  remove from your folder (Recycle Bin)      " +
                     "Shift + Click  run as Administrator",
-            });
-            return group;
+            };
+            return NewGroup("Menu organization", help);
         }
 
         /// Refresh sits on the left, apart from OK and Cancel: it acts at once
@@ -246,10 +261,12 @@ namespace trutility
         {
             FlowLayoutPanel dialogButtons = new FlowLayoutPanel
             {
-                Dock = DockStyle.Right,
                 AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                Anchor = AnchorStyles.Right,
                 FlowDirection = FlowDirection.RightToLeft,
                 WrapContents = false,
+                Margin = Padding.Empty,
             };
 
             Button ok = new Button { Text = "OK", AutoSize = true, MinimumSize = new Size(80, 26) };
@@ -267,19 +284,22 @@ namespace trutility
             AcceptButton = ok;
             CancelButton = cancel;
 
-            // In a flow panel of its own, like OK and Cancel, so it gets the
-            // same size and margins instead of stretching to the row height.
-            FlowLayoutPanel toolButtons = new FlowLayoutPanel
+            // Two columns: Refresh on the left taking the slack, OK and Cancel
+            // on the right at their natural size.
+            TableLayoutPanel row = new TableLayoutPanel
             {
-                Dock = DockStyle.Left,
                 AutoSize = true,
-                WrapContents = false,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                ColumnCount = 2,
+                RowCount = 1,
             };
-            toolButtons.Controls.Add(BuildRefreshButton());
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-            Panel row = new Panel { Height = 34 };
-            row.Controls.Add(dialogButtons);
-            row.Controls.Add(toolButtons);
+            Button refresh = BuildRefreshButton();
+            refresh.Anchor = AnchorStyles.Left;
+            row.Controls.Add(refresh, 0, 0);
+            row.Controls.Add(dialogButtons, 1, 0);
             return row;
         }
 

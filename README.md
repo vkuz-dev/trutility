@@ -89,7 +89,7 @@ Ctrl+Click only works on files in your own folder. Shared folders are read-only.
 
 The box at the top of the menu searches every folder at once, however deep. Click it and type at least two characters; results appear once you stop typing for a second.
 
-To type straight away without clicking, turn on **Put the cursor in the search box when the menu opens** in Settings. It's off by default because it hands the keyboard to the box: arrow keys, Enter and letter keys stop moving around the menu and go into the search instead.
+To type straight away without clicking, turn on **Focus search box by default** in Settings. It's off by default because it hands the keyboard to the box: arrow keys, Enter and letter keys stop moving around the menu and go into the search instead.
 
 ```
 [ fin pay        ]
@@ -119,8 +119,8 @@ Right-click the tray icon → **About / Settings**:
 - **Add to trutility in Explorer context menu** — right-click any file or folder to drop a shortcut into your folder
 - **Run at startup**
 - **Pin icon to tray**
-- **Show file extensions in the menu** — on by default
-- **Put the cursor in the search box when the menu opens** — off by default; see [Searching](#searching)
+- **Show file extensions** — on by default
+- **Focus search box by default** — off by default; see [Searching](#searching)
 - **Your folder** — change its location, reset it, or open it
 - **Refresh menu** — rescans every folder and reloads every icon. Changes are normally picked up on their own; this is for when they aren't, such as a share that just came back online or a program updated in place that still shows its old icon.
 
