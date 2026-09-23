@@ -12,7 +12,7 @@ namespace trutility
     /// While it is empty the menu is the normal tree. Typing swaps the tree for
     /// a flat list of matching files from every level, so something three
     /// submenus deep is one keystroke and Enter away. Clearing the box puts the
-    /// tree back exactly as it was — its items are set aside, not rebuilt.
+    /// tree back exactly as it was - its items are set aside, not rebuilt.
     /// </summary>
     internal sealed class MenuSearchBox
     {
@@ -22,8 +22,8 @@ namespace trutility
         /// The full location is in the tooltip.
         private const int LocationLevels = 2;
 
-        /// A single character matches nearly everything — "t" is inside every
-        /// ".txt" — so the tree stays until there is enough to narrow it down.
+        /// A single character matches nearly everything - "t" is inside every
+        /// ".txt" - so the tree stays until there is enough to narrow it down.
         private const int MinQueryLength = 2;
 
         /// Typing only schedules a search; it runs once the keyboard has been
@@ -35,7 +35,7 @@ namespace trutility
         /// The box's width when nothing else asks for more. A menu is as wide
         /// as its widest entry, so a box with a generous fixed width made every
         /// menu wide. It now starts narrow and stretches to whatever the entries
-        /// need — a long file name, or a search result with its location.
+        /// need - a long file name, or a search result with its location.
         /// </summary>
         private const int MinBoxWidth = 120;
 
@@ -95,8 +95,8 @@ namespace trutility
             };
             _box.TextBox.HandleCreated += (s, e) => SetCueBanner();
 
-            // Only search results carry tooltip text — the full location of one
-            // that is shortened — so ordinary menu entries still show none.
+            // Only search results carry tooltip text - the full location of one
+            // that is shortened - so ordinary menu entries still show none.
             menu.ShowItemToolTips = true;
 
             menu.Items.Add(_box);
@@ -134,7 +134,7 @@ namespace trutility
 
         /// <summary>
         /// Sizes the box to fill exactly the width the other entries need, so
-        /// the entries decide how wide the menu is and the box never does —
+        /// the entries decide how wide the menu is and the box never does -
         /// unless they need less than the box's minimum.
         ///
         /// A hosted box costs more than its own width: the image margin on its
@@ -166,7 +166,7 @@ namespace trutility
         /// A menu whose contents change while it is open keeps its top-left
         /// corner where it was. A tray menu opens above the cursor, so a long
         /// list of results grew it up to the top of the screen, and narrowing
-        /// the search then shrank it upward from there — leaving it stranded
+        /// the search then shrank it upward from there - leaving it stranded
         /// far from the tray. The corner that was at the cursor stays put
         /// instead, so the menu grows and shrinks from the tray outward.
         /// </summary>
@@ -207,7 +207,7 @@ namespace trutility
 
         // ── Switching between tree and results ────────────────────────────────
 
-        /// Going back to the tree is immediate — it is only re-inserting items
+        /// Going back to the tree is immediate - it is only re-inserting items
         /// already built. Only a real search waits for typing to pause.
         private void OnTextChanged()
         {
@@ -279,7 +279,7 @@ namespace trutility
             }
             else if (hits.Count > MaxResults)
             {
-                AddResult(new ToolStripMenuItem((hits.Count - MaxResults) + " more — keep typing")
+                AddResult(new ToolStripMenuItem((hits.Count - MaxResults) + " more - keep typing")
                 {
                     Enabled = false,
                 });

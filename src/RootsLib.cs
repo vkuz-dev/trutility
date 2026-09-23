@@ -110,7 +110,7 @@ namespace trutility
 
         /// LOCALAPPDATA rather than Documents. The folder belonging to the user
         /// is meant to be local and always reachable, and Folder Redirection
-        /// routinely points Documents at a network share — which would put the
+        /// routinely points Documents at a network share - which would put the
         /// one root that must never be remote on a UNC path for most domain
         /// users. LOCALAPPDATA is never roamed or redirected.
         internal static string BuiltInUserPath =>
@@ -132,7 +132,7 @@ namespace trutility
         /// Program Files location, which then keeps working.
         ///
         /// The global default cannot be pinned to HKLM the way the user default
-        /// is pinned to HKCU, because trutility does not run elevated — so the
+        /// is pinned to HKCU, because trutility does not run elevated - so the
         /// preference is expressed in resolution rather than written down. An
         /// administrator who wants the new location moves the content, or names
         /// it explicitly through a root.
@@ -398,7 +398,7 @@ namespace trutility
         /// and the new default applies only to installs with nothing there yet.
         ///
         /// Runs at most once per process, and only touches the disk when HKCU
-        /// carries no choice — so a redirected Documents folder on an unreachable
+        /// carries no choice - so a redirected Documents folder on an unreachable
         /// share is probed once at worst, never on every rebuild.
         /// </summary>
         internal static void MigrateLegacyUserRoot()
@@ -546,8 +546,8 @@ namespace trutility
         /// HKLM views to consult, lowest authority first.
         ///
         /// On 64-bit Windows a 32-bit process is redirected to Wow6432Node, while
-        /// Group Policy and regedit write the native view. Reading both — native
-        /// last, so it wins — means the keys of an administrator are found
+        /// Group Policy and regedit write the native view. Reading both - native
+        /// last, so it wins - means the keys of an administrator are found
         /// whichever bitness trutility happens to be built as.
         /// </summary>
         private static List<RegistryKey> OpenLocalMachineViews()

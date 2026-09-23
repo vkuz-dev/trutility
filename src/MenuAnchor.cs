@@ -5,7 +5,7 @@ namespace trutility
 {
     /// <summary>
     /// The corner of an open menu that should stay where it is when the menu
-    /// changes size — the one it was opened from.
+    /// changes size - the one it was opened from.
     ///
     /// Windows opens a tray menu above and to the left of the cursor, so with
     /// the taskbar at the bottom that corner is the bottom-right one. With the

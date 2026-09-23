@@ -226,7 +226,7 @@ namespace trutility
             {
                 using (Icon icon = Icon.FromHandle(info.hIcon))
                 {
-                    // Clone immediately — the bitmap must not reference
+                    // Clone immediately - the bitmap must not reference
                     // the HICON after DestroyIcon is called in finally.
                     return new Bitmap(icon.ToBitmap());
                 }

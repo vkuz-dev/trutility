@@ -110,7 +110,7 @@ namespace trutility
             return new Label
             {
                 Text =
-                    $"trutility — Tray Utility v{ver.Major}.{ver.Minor}.{ver.Build}\n" +
+                    $"trutility - Tray Utility v{ver.Major}.{ver.Minor}.{ver.Build}\n" +
                     "Keep your favourite files, tools or folders within reach.\n\n" +
                     "Author: Vladimirs Kuznecovs   ·   " +
                     "GitHub: https://github.com/vkuz-dev/trutility",
@@ -152,7 +152,7 @@ namespace trutility
             // Policy may decide where this folder lives. What goes in it is the
             // user's alone, so nothing here is ever disabled by content.
             return NewGroup(
-                managed ? "Your folder — location set by your administrator" : "Your folder",
+                managed ? "Your folder - location set by your administrator" : "Your folder",
                 content);
         }
 
@@ -235,13 +235,13 @@ namespace trutility
             {
                 AutoSize = true,
                 // Explains the divider the user can see, without a lecture on
-                // where the entries above it came from — that is not theirs to
+                // where the entries above it came from - that is not theirs to
                 // manage and knowing would not help them.
                 Text =
                     "Shared tools sit above the thicker line, your own below it.\n" +
                     "Folders with the same name stay separate instead of merging.\n\n" +
                     // Each marker on its own line with a plain indent, rather
-                    // than columns padded with spaces — those drift apart at a
+                    // than columns padded with spaces - those drift apart at a
                     // different DPI or font size.
                     "Append to a name:\n" +
                     "    $^  separator above      $_  separator below      $^_  both sides\n" +
@@ -304,8 +304,8 @@ namespace trutility
         }
 
         /// <summary>
-        /// Rescans every folder and reloads every icon. Rarely needed — changes
-        /// are picked up on their own — but a share that was offline is only
+        /// Rescans every folder and reloads every icon. Rarely needed - changes
+        /// are picked up on their own - but a share that was offline is only
         /// re-checked every few minutes, and an updated program can keep its old
         /// icon until the cache is cleared.
         /// </summary>
@@ -357,7 +357,7 @@ namespace trutility
             }
 
             // Reset means "drop my choice and fall back", not "pin the path the
-            // fallback currently resolves to" — writing it back would make the
+            // fallback currently resolves to" - writing it back would make the
             // default permanent and survive a later policy change.
             if (_userRootChanged)
             {
@@ -393,7 +393,7 @@ namespace trutility
         }
 
         /// Previews the fallback without applying it, so closing the dialog
-        /// without pressing OK leaves the current folder alone — the same way
+        /// without pressing OK leaves the current folder alone - the same way
         /// Change… behaves.
         private void OnResetUserRoot(object sender, EventArgs e)
         {

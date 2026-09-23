@@ -11,7 +11,7 @@ namespace trutility
             // ── Handle the --add <file> argument from the Explorer shell verb ──
             // When the user right-clicks a file and chooses "Add to trutility",
             // Explorer launches:  trutility.exe --add "C:\path\to\file.exe"
-            // We create the shortcut and exit — no tray UI needed.
+            // We create the shortcut and exit - no tray UI needed.
             if (args.Length == 2 &&
                 string.Equals(args[0], "--add", StringComparison.OrdinalIgnoreCase))
             {

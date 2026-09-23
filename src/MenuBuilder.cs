@@ -19,7 +19,7 @@ namespace trutility
         public bool IsSectionBoundary { get; }
 
         /// Marked $X: this folder is a container on disk only. It is never shown
-        /// itself — its children take its place in the parent menu.
+        /// itself - its children take its place in the parent menu.
         public bool IsFlattened { get; set; }
 
         /// Set on top-level entries that came from the user's own folder; their
@@ -47,7 +47,7 @@ namespace trutility
         ///
         /// Children used to be held in a dictionary as well as a list, so adding
         /// one whose key already existed replaced it in place. Nothing ever
-        /// looked a child up by key — the index only existed to power that
+        /// looked a child up by key - the index only existed to power that
         /// replacement, and the replacement only ever lost entries: two folders
         /// called "Tools" from different places are two entries, and making that
         /// impossible to get wrong is the whole point of keeping them separate.
@@ -271,7 +271,7 @@ namespace trutility
             }
 
             // The rule is "a divider between files and folders", so it belongs on
-            // whatever ends up first among them — which for a flattened folder is
+            // whatever ends up first among them - which for a flattened folder is
             // one of its promoted children, not the folder itself.
             if (fileNodes.Count > 0 && rendered.Count > firstFolder)
             {
@@ -285,7 +285,7 @@ namespace trutility
         }
 
         /// <summary>
-        /// Adds a folder, or — when it is marked $X — the children it stands in
+        /// Adds a folder, or - when it is marked $X - the children it stands in
         /// for, at the position the folder itself would have taken.
         ///
         /// Promoted children are keyed under the folder they came from, so a
@@ -325,8 +325,8 @@ namespace trutility
                         && LinkExtensions.Contains(Path.GetExtension(fileName)))
                     {
                         // A $F link is a folder expansion, not an entry. When the
-                        // target cannot be expanded — offline share, denied ACL,
-                        // already on the menu, or inside another root — nothing is
+                        // target cannot be expanded - offline share, denied ACL,
+                        // already on the menu, or inside another root - nothing is
                         // shown, rather than a dead item that errors when clicked.
                         MenuNode followed = TryFollow(file, parsed, context);
                         if (followed != null)

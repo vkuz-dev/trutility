@@ -44,7 +44,7 @@ namespace trutility
             }
         }
 
-        /// The folder belonging to the user — the only one trutility writes to.
+        /// The folder belonging to the user - the only one trutility writes to.
         internal static string UserRoot => RootsLib.ResolveUserRootPath();
 
         internal static void SetUserRoot(string path) => RootsLib.SetUserRoot(path);
@@ -208,7 +208,7 @@ namespace trutility
 
             // Nothing here may touch a configured folder. A root can sit on a
             // share that is slow or unreachable, and this runs before the tray
-            // icon exists — probing one would stall the icon for the length of
+            // icon exists - probing one would stall the icon for the length of
             // an SMB timeout at every logon. Folder work happens on the
             // background rebuild instead.
             ApplyShellPolicy();
@@ -312,7 +312,7 @@ namespace trutility
             {
                 // Being superseded is the ordinary outcome during a burst of file
                 // events, not a failure, so the token is read rather than passed
-                // to Task.Delay — otherwise the common path would throw.
+                // to Task.Delay - otherwise the common path would throw.
                 await Task.Delay(DebounceMs);
                 if (token.IsCancellationRequested) return;
 
@@ -367,7 +367,7 @@ namespace trutility
         /// per file no matter what. The only real choice is which thread pays
         /// and when: building the menu with them froze the tray when a folder
         /// was added, and loading them on open put a hitch on every first look
-        /// inside a folder — which is the far more frequent event. Here the UI
+        /// inside a folder - which is the far more frequent event. Here the UI
         /// thread pays neither, and a menu that is opened later finds every icon
         /// already cached.
         ///
@@ -525,7 +525,7 @@ namespace trutility
         /// Loads the icons for one menu level, just before it is shown.
         ///
         /// A shell icon lookup costs a millisecond or more per file, and the
-        /// whole tree used to be resolved while the menu was built — on the UI
+        /// whole tree used to be resolved while the menu was built - on the UI
         /// thread, for every rebuild. That is seconds of freeze on a large
         /// folder, nearly all of it spent on submenus nobody opened. Nothing can
         /// be seen inside a closed submenu, so the work waits until it opens.
@@ -537,7 +537,7 @@ namespace trutility
         {
             // Setting an item's Image makes its menu lay itself out again, so
             // filling a level one item at a time relaid the whole level once per
-            // item — quadratic. With every icon already cached, a 250-entry
+            // item - quadratic. With every icon already cached, a 250-entry
             // submenu took over five seconds to open, freezing the highlight and
             // swallowing clicks. Suspended, the level is laid out once: ~10 ms.
             ToolStrip owner = items.Count > 0 ? items[0].Owner : null;
@@ -711,7 +711,7 @@ namespace trutility
         /// <summary>
         /// A full refresh: rescan every folder and forget every cached icon.
         /// Watchers make this rarely necessary, so the usual reason to ask is
-        /// something they could not see — a share that came back online, or a
+        /// something they could not see - a share that came back online, or a
         /// program updated in place whose old icon is still cached.
         /// </summary>
         private void RefreshMenu()
@@ -723,8 +723,8 @@ namespace trutility
         // ── FileSystemWatcher ─────────────────────────────────────────────────
 
         /// <summary>
-        /// Holds one watcher per folder the last scan actually reached — every
-        /// root plus every folder followed through a $F shortcut — so edits
+        /// Holds one watcher per folder the last scan actually reached - every
+        /// root plus every folder followed through a $F shortcut - so edits
         /// anywhere on the menu rebuild it live.
         ///
         /// Anything that could not be watched turns on recovery polling, which

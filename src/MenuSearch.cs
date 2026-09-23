@@ -71,7 +71,7 @@ namespace trutility
         }
 
         /// <summary>
-        /// Every entry matching the query, best first — but shared entries always
+        /// Every entry matching the query, best first - but shared entries always
         /// come before the user's own, so results keep the same line the menu
         /// has. Within each side, a name that starts with the query beats one
         /// that merely contains it, which beats a match found only in the

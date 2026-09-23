@@ -18,7 +18,7 @@ namespace trutility.Settings
 
         /// <summary>
         /// Whether the search box takes the keyboard when the menu opens. Off by
-        /// default: unfocused, the menu behaves like any other — arrows move the
+        /// default: unfocused, the menu behaves like any other - arrows move the
         /// highlight, Enter launches it, a letter jumps to an entry. Focused, all
         /// of that goes to the box instead, which suits someone who always
         /// searches and surprises someone who navigates.

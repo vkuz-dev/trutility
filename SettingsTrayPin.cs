@@ -46,7 +46,7 @@ namespace trutility.Settings
 
         /// <summary>
         /// Returns true when HKLM carries a PinToTray value but HKCU has no explicit
-        /// override yet — i.e. the effective state is driven by policy, not by the user.
+        /// override yet - i.e. the effective state is driven by policy, not by the user.
         /// Writing to HKCU via SaveTrayPin() will shadow the HKLM value.
         /// </summary>
         public static bool IsManagedByPolicy()
