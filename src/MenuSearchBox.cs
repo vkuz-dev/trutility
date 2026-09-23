@@ -18,6 +18,10 @@ namespace trutility
     {
         private const int MaxResults = 25;
 
+        /// How many folder levels of a result's location are shown beside it.
+        /// The full location is in the tooltip.
+        private const int LocationLevels = 2;
+
         /// A single character matches nearly everything — "t" is inside every
         /// ".txt" — so the tree stays until there is enough to narrow it down.
         private const int MinQueryLength = 2;
@@ -90,6 +94,10 @@ namespace trutility
                 }
             };
             _box.TextBox.HandleCreated += (s, e) => SetCueBanner();
+
+            // Only search results carry tooltip text — the full location of one
+            // that is shortened — so ordinary menu entries still show none.
+            menu.ShowItemToolTips = true;
 
             menu.Items.Add(_box);
             menu.Items.Add(new ToolStripSeparator());
@@ -247,7 +255,11 @@ namespace trutility
                 }
 
                 ToolStripMenuItem item = _newFileItem(hit.Node);
-                item.ShortcutKeyDisplayString = hit.Location;
+                item.ShortcutKeyDisplayString = MenuSearch.ShortLocation(hit.Location, LocationLevels);
+                if (item.ShortcutKeyDisplayString != hit.Location)
+                {
+                    item.ToolTipText = hit.Location;
+                }
                 AddResult(item);
 
                 previousWasShared = !hit.IsYours;

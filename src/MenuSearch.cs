@@ -95,6 +95,22 @@ namespace trutility
                 .ToList();
         }
 
+        /// <summary>
+        /// The first few levels of a location, with "…" standing in for the
+        /// rest. Results can sit many folders deep, and showing the whole path
+        /// beside each one made the menu as wide as the deepest match. The full
+        /// location goes in the tooltip instead.
+        /// </summary>
+        public static string ShortLocation(string location, int levels)
+        {
+            if (string.IsNullOrEmpty(location)) return location ?? "";
+
+            string[] parts = location.Split(new[] { LocationSeparator }, StringSplitOptions.None);
+            if (parts.Length <= levels) return location;
+
+            return string.Join(LocationSeparator, parts.Take(levels)) + LocationSeparator + "…";
+        }
+
         private static int Rank(SearchEntry entry, string query, string[] words)
         {
             if (entry.Name.StartsWith(query, StringComparison.OrdinalIgnoreCase)) return 0;
