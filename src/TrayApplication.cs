@@ -535,12 +535,26 @@ namespace trutility
         /// </summary>
         private static void FillIcons(ToolStripItemCollection items)
         {
-            foreach (ToolStripItem item in items)
+            // Setting an item's Image makes its menu lay itself out again, so
+            // filling a level one item at a time relaid the whole level once per
+            // item — quadratic. With every icon already cached, a 250-entry
+            // submenu took over five seconds to open, freezing the highlight and
+            // swallowing clicks. Suspended, the level is laid out once: ~10 ms.
+            ToolStrip owner = items.Count > 0 ? items[0].Owner : null;
+            owner?.SuspendLayout();
+            try
             {
-                string filePath = item.Tag as string;
-                if (filePath == null || item.Image != null) continue;
+                foreach (ToolStripItem item in items)
+                {
+                    string filePath = item.Tag as string;
+                    if (filePath == null || item.Image != null) continue;
 
-                item.Image = IconsLib.GetIcon(filePath);
+                    item.Image = IconsLib.GetIcon(filePath);
+                }
+            }
+            finally
+            {
+                owner?.ResumeLayout(true);
             }
         }
 
