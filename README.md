@@ -30,6 +30,8 @@ C:\ProgramData\trutility\          %LOCALAPPDATA%\trutility\
 ```
 
 ```
+[ Search…        ]         ← see Searching
+───────────────
 server1                    ← files first
 ───────────────
 Windows Tools    ▶  eventvwr.msc     ← then folders
@@ -82,6 +84,31 @@ A `$F` shortcut shows nothing at all — rather than a dead entry — when its t
 | **Ctrl** + Click | remove from your folder (sent to the Recycle Bin) |
 
 Ctrl+Click only works on files in your own folder. Shared folders are read-only.
+
+## Searching
+
+The box at the top of the menu searches every folder at once, however deep. Type at least two characters; results appear once you stop typing for a second.
+
+```
+[ fin pay        ]
+───────────────────────────────────
+payroll.xlsx       Finance ▸ Reports
+```
+
+- Every word you type must appear in the file's name or in the folders it sits in, in any order — `fin pay` finds `payroll` inside `Finance`.
+- Names that start with what you typed come first. Shared results stay above the thick line and yours below it, as in the menu.
+- Each result shows where it is on the right: the first two folders, with `…` for deeper ones. Hover over it for the full location.
+- At most 25 results are listed, with a last line saying how many more matched.
+- Results are always files. Folder names count toward a match, but folders themselves aren't listed.
+
+| Key | Effect |
+|---|---|
+| **Enter** | launch the top result — straight away, without waiting for the pause |
+| **Shift** + **Enter** | launch it as Administrator |
+| **Down** | move into the results |
+| **Esc** | clear the box; press it again to close the menu |
+
+A result behaves like any other entry, so Shift+Click and Ctrl+Click work on it too.
 
 ## Settings
 
@@ -205,7 +232,8 @@ No NuGet packages. Pushing a `v*` tag builds a release through GitHub Actions.
 
 ## Notes
 
-- Folder scanning and icon loading run off the UI thread; a 400 ms debounce collapses bursts of file-system changes into one rebuild.
+- Folders are scanned and icons pre-loaded in the background, so opening a menu only reads what is already loaded. A submenu opened in the first moments after start-up or Refresh may still load its own icons as it opens.
+- A 400 ms debounce collapses bursts of file-system changes into one rebuild.
 - Folders that could not be watched — a share that was offline at start-up — are retried every five minutes until they are, then polling stops.
 - A named mutex keeps one instance running.
 
