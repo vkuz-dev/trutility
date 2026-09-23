@@ -22,6 +22,11 @@ namespace trutility
         /// itself — its children take its place in the parent menu.
         public bool IsFlattened { get; set; }
 
+        /// Set on top-level entries that came from the user's own folder; their
+        /// descendants belong to the same side. The thick line only exists when
+        /// both sides have content, so it cannot be relied on to tell them apart.
+        public bool BelongsToUser { get; set; }
+
         private readonly List<MenuNode> _children = new List<MenuNode>();
 
         public IReadOnlyList<MenuNode> Children => _children;
@@ -227,14 +232,18 @@ namespace trutility
         /// </summary>
         private static void AppendSection(MenuNode target, Root root, MenuNode section)
         {
+            bool yours = root.Scope == RootScope.User;
+
             if (!string.IsNullOrWhiteSpace(root.Label))
             {
+                section.BelongsToUser = yours;
                 target.AddChild(section);
                 return;
             }
 
             foreach (MenuNode child in section.Children)
             {
+                child.BelongsToUser = yours;
                 target.AddChild(child);
             }
         }

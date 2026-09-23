@@ -343,12 +343,13 @@ namespace trutility
                 globalRoots, userRoot, out accessErrors, out followedFolders,
                 SettingsExtensions.IsShown());
 
+            IReadOnlyList<SearchEntry> searchIndex = MenuSearch.Index(tree);
             List<string> watchPaths = CollectWatchPaths(globalRoots, userRoot, followedFolders);
             string userRootPath = userRoot.Path;
 
             _invokeHelper.BeginInvoke((Action)(() =>
             {
-                ApplyNewMenu(tree);
+                ApplyNewMenu(tree, searchIndex);
                 ReportAccessErrors(accessErrors, userRootPath);
                 SyncWatchers(watchPaths);
             }));
@@ -446,15 +447,24 @@ namespace trutility
             return paths;
         }
 
-        private void ApplyNewMenu(MenuNode tree)
+        private void ApplyNewMenu(MenuNode tree, IReadOnlyList<SearchEntry> searchIndex)
         {
             ContextMenuStrip newMenu = new ContextMenuStrip();
+
+            MenuSearchBox search = new MenuSearchBox(
+                newMenu, searchIndex, NewFileItem, FillIcons, LaunchFile);
             PopulateMenu(newMenu.Items, tree);
+            search.CaptureTree();
             AddStaticItems(newMenu);
 
-            // The top level is the one part guaranteed to be shown, and it is
-            // still only filled when the menu opens rather than on every rebuild.
-            newMenu.Opening += (s, e) => FillIcons(newMenu.Items);
+            // Every open starts from the full tree. The top level is the one part
+            // guaranteed to be shown, and it is still only filled when the menu
+            // opens rather than on every rebuild.
+            newMenu.Opening += (s, e) =>
+            {
+                search.Reset();
+                FillIcons(newMenu.Items);
+            };
 
             ContextMenuStrip old = _menu;
             _menu = newMenu;
