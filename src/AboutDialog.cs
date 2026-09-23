@@ -214,8 +214,8 @@ namespace trutility
                     // different DPI or font size.
                     "Append to a name:\n" +
                     "    $^  separator above      $_  separator below      $^_  both sides\n" +
-                    "    $F  expand a shortcut as a submenu\n" +
-                    "    $X  show a folder's contents in its place, without the folder\n\n" +
+                    "    $F  a shortcut to a folder opens as a submenu, like the folder itself\n" +
+                    "    $X  a folder (or shortcut to one) is replaced by its contents\n\n" +
                     "On any menu item:\n" +
                     "    Ctrl + Click  remove from your folder (Recycle Bin)      " +
                     "Shift + Click  run as Administrator",

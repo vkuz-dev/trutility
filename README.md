@@ -49,17 +49,17 @@ Within each folder, files are listed before subfolders, parted by a thin line. `
 
 ## Organising the menu
 
-Append to a **file or folder name**:
+Append to a **file or folder name**. Suffixes are never displayed — `putty$^_.lnk` shows as `putty`.
 
 | Suffix | Effect |
 |---|---|
 | `$^` | separator above |
 | `$_` | separator below |
 | `$^_` | separators on both sides |
-| `$F` | on a `.lnk` or `.url`: expand the target folder as a submenu instead of showing the shortcut |
-| `$X` | show a folder's contents in its place — the folder itself never appears |
+| `$F` | a shortcut to a folder opens as a submenu, like the folder itself — **adds** a menu level |
+| `$X` | a folder, or a shortcut to one, is replaced by its contents — **removes** a menu level |
 
-Example: `putty$^_.lnk` gets a separator on each side.
+`$F` only applies to `.lnk` and `.url` shortcuts. `$X` applies to folders and shortcuts alike.
 
 `$X` is how you keep a folder on disk without it showing up in the menu:
 
