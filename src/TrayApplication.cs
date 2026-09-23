@@ -341,7 +341,7 @@ namespace trutility
             List<string> followedFolders;
             MenuNode tree = MenuBuilder.BuildTree(
                 globalRoots, userRoot, out accessErrors, out followedFolders,
-                SettingsExtensions.IsShown());
+                ToggleSetting.ShowExtensions.IsOn());
 
             IReadOnlyList<SearchEntry> searchIndex = MenuSearch.Index(tree);
             List<string> watchPaths = CollectWatchPaths(globalRoots, userRoot, followedFolders);

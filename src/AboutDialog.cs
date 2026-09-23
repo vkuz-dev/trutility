@@ -25,6 +25,7 @@ namespace trutility
         private CheckBox _chkStartup;
         private CheckBox _chkTrayPin;
         private CheckBox _chkExtensions;
+        private CheckBox _chkFocusSearch;
         private readonly Action _refreshMenu;
 
         public AboutDialog(Root userRoot, Action refreshMenu)
@@ -37,7 +38,7 @@ namespace trutility
             MaximizeBox = false;
             MinimizeBox = false;
             StartPosition = FormStartPosition.CenterScreen;
-            ClientSize = new Size(700, 556);
+            ClientSize = new Size(700, 580);
             MinimumSize = new Size(600, 430);
 
             Controls.Add(BuildLayout());
@@ -157,7 +158,7 @@ namespace trutility
             GroupBox group = new GroupBox
             {
                 Text = "Settings",
-                Height = 136,
+                Height = 160,
                 Padding = new Padding(10, 6, 10, 6),
             };
 
@@ -176,7 +177,11 @@ namespace trutility
 
             _chkExtensions = NewSetting(
                 "Show file extensions in the menu (shortcuts never show theirs)",
-                SettingsExtensions.IsShown(), SettingsExtensions.IsManagedByPolicy());
+                ToggleSetting.ShowExtensions.IsOn(), ToggleSetting.ShowExtensions.IsManagedByPolicy());
+
+            _chkFocusSearch = NewSetting(
+                "Put the cursor in the search box when the menu opens",
+                ToggleSetting.FocusSearch.IsOn(), ToggleSetting.FocusSearch.IsManagedByPolicy());
 
             FlowLayoutPanel stack = new FlowLayoutPanel
             {
@@ -184,7 +189,10 @@ namespace trutility
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
             };
-            stack.Controls.AddRange(new Control[] { _chkShell, _chkStartup, _chkTrayPin, _chkExtensions });
+            stack.Controls.AddRange(new Control[]
+            {
+                _chkShell, _chkStartup, _chkTrayPin, _chkExtensions, _chkFocusSearch,
+            });
             group.Controls.Add(stack);
             return group;
         }
@@ -317,12 +325,15 @@ namespace trutility
             if (_chkTrayPin.Enabled)
                 SettingsTrayPin.SaveTrayPin(_chkTrayPin.Checked);
 
-            // Only written when it actually changed: saving the default would
-            // pin it in HKCU and shadow any policy an administrator sets later.
-            if (_chkExtensions.Enabled && _chkExtensions.Checked != SettingsExtensions.IsShown())
+            // Extensions change what the menu shows, so the menu is rebuilt.
+            // Focus is read each time the menu opens and needs nothing more.
+            if (_chkExtensions.Enabled && ToggleSetting.ShowExtensions.SaveIfChanged(_chkExtensions.Checked))
             {
-                SettingsExtensions.Save(_chkExtensions.Checked);
                 MenuNeedsRebuild = true;
+            }
+            if (_chkFocusSearch.Enabled)
+            {
+                ToggleSetting.FocusSearch.SaveIfChanged(_chkFocusSearch.Checked);
             }
 
             // Reset means "drop my choice and fall back", not "pin the path the

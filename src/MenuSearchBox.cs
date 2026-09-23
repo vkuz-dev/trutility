@@ -106,7 +106,14 @@ namespace trutility
             menu.Opened += (s, e) =>
             {
                 _anchor = MenuAnchor.Detect(_menu.Bounds, Cursor.Position);
-                _box.Focus();
+
+                // Off by default, so the menu keeps working like any other with
+                // the keyboard; clicking the box is enough to start searching.
+                // Read on every open, so changing it needs no rebuild.
+                if (Settings.ToggleSetting.FocusSearch.IsOn())
+                {
+                    _box.Focus();
+                }
             };
             menu.Closed += (s, e) => _anchor = null;
             menu.Disposed += (s, e) =>
