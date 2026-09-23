@@ -96,16 +96,43 @@ Any setting an administrator has decided is shown as *[Managed by Administrator]
 
 ## Deploying to groups
 
-The single shared folder is often too broad: a department needs its own tools without every user on the machine seeing them. Additional shared folders are defined as **registry subkeys**, one per folder.
+The shared folder is visible to everyone on the machine, but a department usually needs its own tools. There are two ways to do this. Start with the first one.
 
-Subkeys are used rather than one list value on purpose: two policies that each assign a folder both apply, so a user in two departments receives both. Nothing collides.
+### Shortcuts and share permissions
 
-### Define a folder
-
-Create a subkey named after the folder — the name is its identity:
+Put a `$F` shortcut to the department's share in the shared folder:
 
 ```
-HKEY_LOCAL_MACHINE\SOFTWARE\Policies\trutility\Roots\Finance
+C:\ProgramData\trutility\
+    Finance$F.lnk      →  \\fs01\dept\finance\tools
+    Helpdesk$F.lnk     →  \\fs01\dept\helpdesk\tools
+```
+
+Then give only that department read access to its share. That's all the configuration there is:
+
+- **Members** see a `Finance` submenu with the share's contents.
+- **Everyone else** sees nothing — a `$F` shortcut whose target can't be read is left out of the menu entirely, not shown as a broken entry.
+- Nobody can remove it: the shared folder is read-only to users, and it sits above the thick line with the rest of the administrator's tools.
+
+Use `Finance$X.lnk` instead to place the share's contents directly in the menu, without a `Finance` submenu around them.
+
+The same shortcuts go on every machine. Who sees what is decided by the share's permissions, so moving someone between departments means changing group membership — nothing on their PC.
+
+### Registry folders
+
+When shortcuts aren't enough, a shared folder can be defined in the registry instead. Use it when you need:
+
+- **Folders that follow the user**, not the machine — no files to put on each PC.
+- **Explicit order** — shortcuts sort alphabetically.
+- **Per-user paths** — `\\fs01\home\%USERNAME%\tools` from one value.
+- **Automatic removal** — Group Policy deletes the key when the policy no longer applies to someone.
+
+#### Define a folder
+
+Create one subkey per folder, named after it:
+
+```
+HKEY_CURRENT_USER\Software\Policies\trutility\Roots\Finance
     Path     REG_EXPAND_SZ   \\fs01\dept\finance\tools
     Label    REG_SZ          Finance
     Order    REG_DWORD       20
@@ -113,24 +140,18 @@ HKEY_LOCAL_MACHINE\SOFTWARE\Policies\trutility\Roots\Finance
 
 | Value | Required | Meaning |
 |---|---|---|
-| `Path` | yes | The folder to scan. `REG_EXPAND_SZ`, or `%VARIABLES%` in a `REG_SZ`, are expanded — so `\\fs01\home\%USERNAME%\tools` serves every user from one value. |
-| `Label` | no | Nest the folder under a submenu of this name. Without it the contents splice in at the top level. |
-| `Order` | no | Sort position, ascending. Defaults to 100; ties break alphabetically. Space them 10, 20, 30. |
-| `Enabled` | no | `0` switches the folder off without deleting the key — including the built-in `Default`. |
+| `Path` | yes | The folder to scan. `%VARIABLES%` are expanded. |
+| `Label` | no | Nest the folder under a submenu of this name. Without it, the contents go straight into the top level. |
+| `Order` | no | Sort position, ascending. Defaults to 100; ties sort alphabetically. Space them 10, 20, 30. |
+| `Enabled` | no | `0` turns the folder off without deleting the key — including the built-in `Default`. |
 
-### Target it at a group
+#### Target it at a group
 
-Link a **user**-scoped GPO to the department's OU or security group and have it create the key under:
+Create the key from a **user**-scoped GPO linked to the department's OU or security group. Each department writes its own subkey, so they never overwrite each other: a user in Finance *and* Helpdesk gets both folders, in `Order` sequence.
 
-```
-HKEY_CURRENT_USER\Software\Policies\trutility\Roots\<Name>
-```
+#### Where trutility looks
 
-Because each department writes its own subkey, a user in Finance *and* Helpdesk gets both folders, in `Order` sequence, with no configuration between the two policies.
-
-### Where trutility looks
-
-Lowest authority first; a later source overrides a folder of the same name, value by value, inheriting whatever it does not set:
+Lowest priority first. A later source overrides a folder with the same name, value by value — anything it doesn't set is kept from the earlier one:
 
 ```
 built-in default                            → the folder named "Default"
@@ -140,9 +161,7 @@ HKCU\SOFTWARE\Policies\trutility\Roots\      user GPO — department targeting
 HKLM\SOFTWARE\Policies\trutility\Roots\      machine GPO — final say
 ```
 
-`HKCU\SOFTWARE\trutility` is deliberately not a source: a user cannot grant themselves a shared folder.
-
-Policy keys live under `Software\Policies` because Group Policy owns and cleans up that subtree — when someone leaves a department, their folder goes with the policy instead of lingering.
+`HKCU\SOFTWARE\trutility` is deliberately not on this list, so users can't give themselves a shared folder.
 
 ### Other things an administrator can set
 
@@ -158,19 +177,20 @@ These apply to anyone who has not already changed the setting themselves — the
 
 Put a shortcut to `trutility.exe` in the **common** Startup folder to force auto-start for every user.
 
-### Two things worth getting right
+### Getting it right
 
-- **ACL the share read-only** for its members. A shared folder anyone can write to is a way to get a shortcut executed by everyone in the department.
-- Enable **Access-Based Enumeration** on the share so members of other departments do not see folders they cannot open.
+- **Members get read access only.** If they can write to the share, any one of them can add a shortcut that everyone else in the department will run.
+- **Test as a standard user.** An administrator can often read shares that a deny rule should block, so testing with your own account will show folders a real user wouldn't see.
+- **Access-Based Enumeration** is optional for trutility, which hides unreadable folders on its own, but it keeps them hidden in Explorer too.
 
 ### Diagnosing
 
 trutility writes to the debug trace, readable with DebugView on the affected machine:
 
-- which folders resolved and from which registry key, at start-up and again whenever the set changes
-- any folder it could not read
+- which registry folders were found and which key each came from, at start-up and whenever that changes
+- every shared folder it couldn't read, including a `$F` target the user has no access to (unreadable folders in the user's own folder show a notification instead)
 
-A folder missing from that list was never configured for this user, or is switched off. One that appears but contributes nothing to the menu is unreachable or empty.
+If a registry folder is missing from that list, it isn't configured for this user or is turned off. If it's listed but nothing from it shows up in the menu, the folder is unreachable or empty.
 
 ## Building
 
