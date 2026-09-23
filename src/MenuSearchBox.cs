@@ -54,6 +54,9 @@ namespace trutility
         private readonly int _contentStart;
         private bool _treeShown = true;
 
+        /// The corner of the open menu kept in place while its size changes.
+        private MenuAnchor _anchor;
+
         /// <summary>
         /// Puts the box at the top of an empty menu. Add the tree items next,
         /// then call CaptureTree so the box knows which items it may swap out.
@@ -92,7 +95,12 @@ namespace trutility
             menu.Items.Add(new ToolStripSeparator());
             _contentStart = menu.Items.Count;
 
-            menu.Opened += (s, e) => _box.Focus();
+            menu.Opened += (s, e) =>
+            {
+                _anchor = MenuAnchor.Detect(_menu.Bounds, Cursor.Position);
+                _box.Focus();
+            };
+            menu.Closed += (s, e) => _anchor = null;
             menu.Disposed += (s, e) =>
             {
                 _debounce.Dispose();
@@ -135,6 +143,24 @@ namespace trutility
 
             _box.Width = Math.Max(MinBoxWidth, entriesWidth - overhead);
             _menu.PerformLayout();
+
+            KeepAnchored();
+        }
+
+        /// <summary>
+        /// A menu whose contents change while it is open keeps its top-left
+        /// corner where it was. A tray menu opens above the cursor, so a long
+        /// list of results grew it up to the top of the screen, and narrowing
+        /// the search then shrank it upward from there — leaving it stranded
+        /// far from the tray. The corner that was at the cursor stays put
+        /// instead, so the menu grows and shrinks from the tray outward.
+        /// </summary>
+        private void KeepAnchored()
+        {
+            if (_anchor == null || !_menu.Visible) return;
+
+            Rectangle screen = Screen.FromPoint(_anchor.Corner).Bounds;
+            _menu.Location = _anchor.PlaceMenu(_menu.Size, screen);
         }
 
         /// Each time the menu opens it starts from the full tree.
