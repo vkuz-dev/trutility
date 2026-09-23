@@ -27,6 +27,14 @@ namespace trutility
         /// per letter.
         private const int DebounceMs = 1000;
 
+        /// <summary>
+        /// The box's width when nothing else asks for more. A menu is as wide
+        /// as its widest entry, so a box with a generous fixed width made every
+        /// menu wide. It now starts narrow and stretches to whatever the entries
+        /// need — a long file name, or a search result with its location.
+        /// </summary>
+        private const int MinBoxWidth = 120;
+
         private const int EM_SETCUEBANNER = 0x1501;
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -64,7 +72,7 @@ namespace trutility
             _debounce = new System.Windows.Forms.Timer { Interval = DebounceMs };
             _debounce.Tick += (s, e) => FlushPending();
 
-            _box = new ToolStripTextBox { AutoSize = false, Width = 260 };
+            _box = new ToolStripTextBox { AutoSize = false, Width = MinBoxWidth };
             _box.TextChanged += (s, e) => OnTextChanged();
             _box.KeyDown += OnKeyDown;
 
@@ -99,6 +107,34 @@ namespace trutility
             {
                 _treeItems.Add(_menu.Items[i]);
             }
+        }
+
+        /// <summary>
+        /// Sizes the box to fill exactly the width the other entries need, so
+        /// the entries decide how wide the menu is and the box never does —
+        /// unless they need less than the box's minimum.
+        ///
+        /// A hosted box costs more than its own width: the image margin on its
+        /// left and space the menu keeps free on its right. Stretching it to
+        /// the full content width ignored that, and pushed the menu wider on
+        /// every fit. The overhead is measured rather than assumed, since both
+        /// parts vary with DPI and theme.
+        /// </summary>
+        internal void FitWidth()
+        {
+            // What the entries alone need: at 1px the box cannot be the widest.
+            _box.Width = 1;
+            _menu.PerformLayout();
+            int entriesWidth = _menu.GetPreferredSize(Size.Empty).Width;
+
+            // Made deliberately the widest, the box shows what it costs on top
+            // of its own width.
+            _box.Width = entriesWidth;
+            _menu.PerformLayout();
+            int overhead = _menu.GetPreferredSize(Size.Empty).Width - entriesWidth;
+
+            _box.Width = Math.Max(MinBoxWidth, entriesWidth - overhead);
+            _menu.PerformLayout();
         }
 
         /// Each time the menu opens it starts from the full tree.
@@ -158,6 +194,7 @@ namespace trutility
                 _treeShown = true;
             }
             _menu.ResumeLayout();
+            FitWidth();
         }
 
         /// <summary>
@@ -205,6 +242,7 @@ namespace trutility
 
             _fillIcons(_menu.Items);
             _menu.ResumeLayout();
+            FitWidth();
         }
 
         private void AddResult(ToolStripItem item)
