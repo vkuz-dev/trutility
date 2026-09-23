@@ -17,6 +17,16 @@ namespace trutility
     internal sealed class MenuSearchBox
     {
         private const int MaxResults = 25;
+
+        /// A single character matches nearly everything — "t" is inside every
+        /// ".txt" — so the tree stays until there is enough to narrow it down.
+        private const int MinQueryLength = 2;
+
+        /// Typing only schedules a search; it runs once the keyboard has been
+        /// quiet this long, so a word typed quickly costs one search, not one
+        /// per letter.
+        private const int DebounceMs = 1000;
+
         private const int EM_SETCUEBANNER = 0x1501;
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode)]
@@ -29,6 +39,7 @@ namespace trutility
         private readonly Action<ToolStripItemCollection> _fillIcons;
         private readonly Action<string, bool> _launch;
 
+        private readonly System.Windows.Forms.Timer _debounce;
         private readonly List<ToolStripItem> _treeItems = new List<ToolStripItem>();
         private readonly List<ToolStripItem> _resultItems = new List<ToolStripItem>();
         private List<SearchEntry> _hits = new List<SearchEntry>();
@@ -50,8 +61,11 @@ namespace trutility
             _fillIcons = fillIcons;
             _launch = launch;
 
+            _debounce = new System.Windows.Forms.Timer { Interval = DebounceMs };
+            _debounce.Tick += (s, e) => FlushPending();
+
             _box = new ToolStripTextBox { AutoSize = false, Width = 260 };
-            _box.TextChanged += (s, e) => Apply();
+            _box.TextChanged += (s, e) => OnTextChanged();
             _box.KeyDown += OnKeyDown;
 
             // Without this the menu treats Enter, Esc and Down as its own
@@ -71,7 +85,11 @@ namespace trutility
             _contentStart = menu.Items.Count;
 
             menu.Opened += (s, e) => _box.Focus();
-            menu.Disposed += (s, e) => DisposeDetached();
+            menu.Disposed += (s, e) =>
+            {
+                _debounce.Dispose();
+                DisposeDetached();
+            };
         }
 
         /// Everything added after the box, up to now, is the tree it swaps out.
@@ -86,6 +104,7 @@ namespace trutility
         /// Each time the menu opens it starts from the full tree.
         public void Reset()
         {
+            _debounce.Stop();
             if (_box.Text.Length > 0)
             {
                 _box.Text = "";
@@ -96,16 +115,32 @@ namespace trutility
             }
         }
 
+        /// <summary>
+        /// Runs a scheduled search now instead of waiting out the debounce.
+        /// Enter and Down both need it: a fast typist pressing Enter would
+        /// otherwise launch from the results of an earlier, shorter query.
+        /// </summary>
+        internal void FlushPending()
+        {
+            if (!_debounce.Enabled) return;
+
+            _debounce.Stop();
+            ShowResults(MenuSearch.Find(_index, _box.Text));
+        }
+
         // ── Switching between tree and results ────────────────────────────────
 
-        private void Apply()
+        /// Going back to the tree is immediate — it is only re-inserting items
+        /// already built. Only a real search waits for typing to pause.
+        private void OnTextChanged()
         {
-            if (_box.Text.Trim().Length == 0)
+            _debounce.Stop();
+            if (_box.Text.Trim().Length < MinQueryLength)
             {
                 ShowTree();
                 return;
             }
-            ShowResults(MenuSearch.Find(_index, _box.Text));
+            _debounce.Start();
         }
 
         private void ShowTree()
@@ -236,6 +271,11 @@ namespace trutility
         {
             Keys key = keyData & Keys.KeyCode;
             bool shift = (keyData & Keys.Shift) != 0;
+
+            if (key == Keys.Enter || key == Keys.Down)
+            {
+                FlushPending();
+            }
 
             if (key == Keys.Enter && _hits.Count > 0)
             {
