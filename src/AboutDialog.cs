@@ -25,7 +25,9 @@ namespace trutility
         private CheckBox _chkStartup;
         private CheckBox _chkTrayPin;
         private CheckBox _chkExtensions;
+        private CheckBox _chkEnableSearch;
         private CheckBox _chkFocusSearch;
+        private bool _focusSearchManaged;
         private readonly Action _refreshMenu;
 
         public AboutDialog(Root userRoot, Action refreshMenu)
@@ -200,9 +202,19 @@ namespace trutility
                 "Show file extensions",
                 ToggleSetting.ShowExtensions.IsOn(), ToggleSetting.ShowExtensions.IsManagedByPolicy());
 
+            _chkEnableSearch = NewSetting(
+                "Enable search box",
+                ToggleSetting.EnableSearch.IsOn(), ToggleSetting.EnableSearch.IsManagedByPolicy());
+
+            _focusSearchManaged = ToggleSetting.FocusSearch.IsManagedByPolicy();
             _chkFocusSearch = NewSetting(
                 "Focus search box by default",
-                ToggleSetting.FocusSearch.IsOn(), ToggleSetting.FocusSearch.IsManagedByPolicy());
+                ToggleSetting.FocusSearch.IsOn(), _focusSearchManaged);
+
+            // With no search box there is nothing to focus, so the option is
+            // greyed out for as long as search is unticked.
+            _chkEnableSearch.CheckedChanged += (s, e) => UpdateFocusSearchAvailability();
+            UpdateFocusSearchAvailability();
 
             FlowLayoutPanel stack = new FlowLayoutPanel
             {
@@ -213,9 +225,14 @@ namespace trutility
             };
             stack.Controls.AddRange(new Control[]
             {
-                _chkShell, _chkStartup, _chkTrayPin, _chkExtensions, _chkFocusSearch,
+                _chkShell, _chkStartup, _chkTrayPin, _chkExtensions, _chkEnableSearch, _chkFocusSearch,
             });
             return NewGroup("Settings", stack);
+        }
+
+        private void UpdateFocusSearchAvailability()
+        {
+            _chkFocusSearch.Enabled = !_focusSearchManaged && _chkEnableSearch.Checked;
         }
 
         private static CheckBox NewSetting(string text, bool value, bool managed)
@@ -345,13 +362,22 @@ namespace trutility
             if (_chkTrayPin.Enabled)
                 SettingsTrayPin.SaveTrayPin(_chkTrayPin.Checked);
 
-            // Extensions change what the menu shows, so the menu is rebuilt.
-            // Focus is read each time the menu opens and needs nothing more.
+            // Extensions and search change what the menu shows, so the menu is
+            // rebuilt. Focus is read each time the menu opens and needs nothing
+            // more.
             if (_chkExtensions.Enabled && ToggleSetting.ShowExtensions.SaveIfChanged(_chkExtensions.Checked))
             {
                 MenuNeedsRebuild = true;
             }
-            if (_chkFocusSearch.Enabled)
+            if (_chkEnableSearch.Enabled && ToggleSetting.EnableSearch.SaveIfChanged(_chkEnableSearch.Checked))
+            {
+                MenuNeedsRebuild = true;
+            }
+
+            // Saved even while greyed out by search being off: that only means
+            // there is nothing to focus right now, and the choice should still
+            // be there when search is turned back on. Only policy prevents it.
+            if (!_focusSearchManaged)
             {
                 ToggleSetting.FocusSearch.SaveIfChanged(_chkFocusSearch.Checked);
             }

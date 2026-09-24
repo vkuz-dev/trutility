@@ -16,6 +16,11 @@ namespace trutility.Settings
         /// has always looked.
         public static readonly ToggleSetting ShowExtensions = new ToggleSetting("ShowExtensions", true);
 
+        /// Whether the menu has a search box at all. On by default. Turned off,
+        /// the menu is the plain tree it was before search existed, and the
+        /// search index is not built.
+        public static readonly ToggleSetting EnableSearch = new ToggleSetting("EnableSearch", true);
+
         /// <summary>
         /// Whether the search box takes the keyboard when the menu opens. Off by
         /// default: unfocused, the menu behaves like any other - arrows move the

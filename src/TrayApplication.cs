@@ -343,7 +343,10 @@ namespace trutility
                 globalRoots, userRoot, out accessErrors, out followedFolders,
                 ToggleSetting.ShowExtensions.IsOn());
 
-            IReadOnlyList<SearchEntry> searchIndex = MenuSearch.Index(tree);
+            // Read once here so the index and the box always agree: no index
+            // means no box, and a menu without search costs nothing for it.
+            IReadOnlyList<SearchEntry> searchIndex =
+                ToggleSetting.EnableSearch.IsOn() ? MenuSearch.Index(tree) : null;
             List<string> watchPaths = CollectWatchPaths(globalRoots, userRoot, followedFolders);
             string userRootPath = userRoot.Path;
 
@@ -451,10 +454,13 @@ namespace trutility
         {
             ContextMenuStrip newMenu = new ContextMenuStrip();
 
-            MenuSearchBox search = new MenuSearchBox(
-                newMenu, searchIndex, NewFileItem, FillIcons, LaunchFile);
+            // With search turned off there is no index, and the menu is the
+            // plain tree with nothing above it.
+            MenuSearchBox search = searchIndex == null
+                ? null
+                : new MenuSearchBox(newMenu, searchIndex, NewFileItem, FillIcons, LaunchFile);
             PopulateMenu(newMenu.Items, tree);
-            search.CaptureTree();
+            search?.CaptureTree();
             AddStaticItems(newMenu);
 
             // Every open starts from the full tree. The top level is the one part
@@ -462,7 +468,7 @@ namespace trutility
             // opens rather than on every rebuild.
             newMenu.Opening += (s, e) =>
             {
-                search.Reset();
+                search?.Reset();
                 FillIcons(newMenu.Items);
             };
 

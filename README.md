@@ -89,6 +89,8 @@ Ctrl+Click only works on files in your own folder. Shared folders are read-only.
 
 The box at the top of the menu searches every folder at once, however deep. Click it and type at least two characters; results appear once you stop typing for a second.
 
+Search is on by default. Untick **Enable search box** in Settings to remove the box and get the plain menu back.
+
 To type straight away without clicking, turn on **Focus search box by default** in Settings. It's off by default because it hands the keyboard to the box: arrow keys, Enter and letter keys stop moving around the menu and go into the search instead.
 
 ```
@@ -120,7 +122,8 @@ Right-click the tray icon → **About / Settings**:
 - **Run at startup**
 - **Pin icon to tray**
 - **Show file extensions** — on by default
-- **Focus search box by default** — off by default; see [Searching](#searching)
+- **Enable search box** — on by default; turned off, the menu has no search box at all
+- **Focus search box by default** — off by default, and greyed out while search is off; see [Searching](#searching)
 - **Your folder** — change its location, reset it, or open it
 - **Refresh menu** — rescans every folder and reloads every icon. Changes are normally picked up on their own; this is for when they aren't, such as a share that just came back online or a program updated in place that still shows its old icon.
 
@@ -205,6 +208,7 @@ Under `HKLM\SOFTWARE\trutility`:
 | `AddToShell` | `REG_DWORD` | Explorer context-menu entry on or off. |
 | `PinToTray` | `REG_DWORD` | Tray icon pinned or not. |
 | `ShowExtensions` | `REG_DWORD` | File extensions shown in the menu or not. |
+| `EnableSearch` | `REG_DWORD` | Search box shown at the top of the menu, or not. |
 | `FocusSearch` | `REG_DWORD` | Search box takes the keyboard when the menu opens, or not. |
 
 These apply to anyone who has not already changed the setting themselves — the dialog then shows it greyed out as managed. **A user who changed it before the policy arrived keeps their own choice**, because the matching `HKCU` value shadows `HKLM`. To re-assert one, delete it from `HKCU\SOFTWARE\trutility` as well.
