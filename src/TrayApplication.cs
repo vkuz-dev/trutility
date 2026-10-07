@@ -583,6 +583,13 @@ namespace trutility
 
             item.MouseDown += (s, e) =>
             {
+                if (e.Button == MouseButtons.Middle)
+                {
+                    OpenFileLocation(filePath);
+                    _menu?.Close();
+                    return;
+                }
+
                 if (e.Button != MouseButtons.Left) return;
 
                 if ((Control.ModifierKeys & Keys.Control) != 0)
@@ -637,6 +644,19 @@ namespace trutility
             catch (Exception ex)
             {
                 MessageBox.Show($"Could not launch:\n{path}\n\n{ex.Message}",
+                    "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void OpenFileLocation(string path)
+        {
+            try
+            {
+                Process.Start("explorer.exe", $"/select,\"{path}\"");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not open the location of:\n{path}\n\n{ex.Message}",
                     "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }

@@ -251,29 +251,21 @@ namespace trutility
             Label help = new Label
             {
                 AutoSize = true,
-                // Explains the divider the user can see, without a lecture on
-                // where the entries above it came from - that is not theirs to
-                // manage and knowing would not help them.
                 Text =
-                    "Shared tools sit above the thicker line, your own below it.\n" +
-                    "Folders with the same name stay separate instead of merging.\n\n" +
-                    // Each marker on its own line with a plain indent, rather
-                    // than columns padded with spaces - those drift apart at a
-                    // different DPI or font size.
+                    "Tools are grouped into Shared (at the top) and Personal (at the bottom).\n\n" +
                     "Append to a name:\n" +
                     "    $^  separator above      $_  separator below      $^_  both sides\n" +
                     "    $F  a shortcut to a folder opens as a submenu, like the folder itself\n" +
                     "    $X  a folder (or shortcut to one) is replaced by its contents, aka - unpack here\n\n" +
                     "    Example: reports$F$^.lnk  →  a folder named \"reports\" shown as a submenu with a separator above.\n\n" +
-                    "On any menu item:\n" +
-                    "    Ctrl + Click  remove from your folder (Recycle Bin)      " +
-                    "Shift + Click  run as Administrator",
+                    "    File actions:\n" +
+                    "    Ctrl + Click  remove from your folder (Recycle Bin)\n" +
+                    "    Shift + Click  run as Administrator\n" +
+                    "    Middle Click  open the folder containing the file in Explorer\n",
             };
             return NewGroup("Menu organization", help);
         }
 
-        /// Refresh sits on the left, apart from OK and Cancel: it acts at once
-        /// and is not part of saving or discarding the dialog.
         private Control BuildButtonRow()
         {
             FlowLayoutPanel dialogButtons = new FlowLayoutPanel
@@ -301,8 +293,6 @@ namespace trutility
             AcceptButton = ok;
             CancelButton = cancel;
 
-            // Two columns: Refresh on the left taking the slack, OK and Cancel
-            // on the right at their natural size.
             TableLayoutPanel row = new TableLayoutPanel
             {
                 AutoSize = true,
