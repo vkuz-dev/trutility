@@ -8,6 +8,9 @@ namespace trutility.Settings
     {
         public static readonly NumberSetting AutoExpandLimit = new NumberSetting("AutoExpandLimit", 250); //default value
 
+        /// The order of files within a folder, as a MenuSort value. Name by default.
+        public static readonly NumberSetting SortBy = new NumberSetting("SortBy", 0);
+
         private const string RegKeyPath = @"SOFTWARE\trutility";
 
         private readonly string _valueName;

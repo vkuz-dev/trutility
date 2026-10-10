@@ -67,6 +67,15 @@ namespace trutility
             new MenuNode("", false, false, isSeparator: true, isSectionBoundary: true);
     }
 
+    /// The order files take within a folder. The numbers are what is stored
+    /// in the registry, so they are never reused or reordered.
+    internal enum MenuSort
+    {
+        Name = 0,
+        Date = 1,
+        Extension = 2,
+    }
+
     internal static class MenuBuilder
     {
         private static readonly HashSet<string> IgnoredFileNames =
@@ -102,6 +111,7 @@ namespace trutility
             /// The most items a folder may hold and still be expanded through an
             /// unmarked shortcut. Zero means unmarked shortcuts never expand.
             public int AutoExpandLimit;
+            public MenuSort Sort;
         }
 
         /// <summary>
@@ -120,7 +130,8 @@ namespace trutility
         /// </summary>
         public static MenuNode BuildTree(IReadOnlyList<Root> globalRoots, Root userRoot,
                                          out List<string> accessErrors, out List<string> followedFolders,
-                                         bool showExtensions = true, int autoExpandLimit = 0)
+                                         bool showExtensions = true, int autoExpandLimit = 0,
+                                         MenuSort sort = MenuSort.Name)
         {
             List<Root> allRoots = new List<Root>(globalRoots ?? new Root[0]);
             if (userRoot != null)
@@ -136,6 +147,7 @@ namespace trutility
                 AllRoots = allRoots,
                 ShowExtensions = showExtensions,
                 AutoExpandLimit = autoExpandLimit,
+                Sort = sort,
             };
             accessErrors = context.AccessErrors;
             followedFolders = context.FollowedFolders;
@@ -317,8 +329,7 @@ namespace trutility
         {
             try
             {
-                foreach (string file in Directory.GetFiles(directory)
-                             .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase))
+                foreach (string file in SortFiles(Directory.GetFiles(directory), context.Sort))
                 {
                     string fileName = Path.GetFileName(file);
                     if (IgnoredFileNames.Contains(fileName) || string.IsNullOrWhiteSpace(fileName))
@@ -365,6 +376,34 @@ namespace trutility
             {
                 context.AccessErrors.Add(directory);
             }
+        }
+
+        /// <summary>
+        /// Puts the files of one folder in the chosen order. Submenus are not
+        /// affected: they stay in name order whatever the setting.
+        ///
+        /// Date means last modified, newest first, and for a shortcut it is the
+        /// shortcut's own date, not its target's - so what was added to the
+        /// folder most recently is at the top. Extension is likewise the
+        /// file's own, so shortcuts group together rather than by what they
+        /// point at. Name settles every tie, which keeps the order fixed from
+        /// one rebuild to the next.
+        /// </summary>
+        private static IEnumerable<string> SortFiles(string[] files, MenuSort sort)
+        {
+            IOrderedEnumerable<string> ordered;
+            switch (sort)
+            {
+                case MenuSort.Date:
+                    ordered = files.OrderByDescending(f => File.GetLastWriteTimeUtc(f));
+                    break;
+                case MenuSort.Extension:
+                    ordered = files.OrderBy(f => Path.GetExtension(f), StringComparer.OrdinalIgnoreCase);
+                    break;
+                default:
+                    return files.OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase);
+            }
+            return ordered.ThenBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase);
         }
 
         private static void ScanSubdirectories(string directory, ScanContext context,

@@ -28,6 +28,7 @@ namespace trutility
         private CheckBox _chkExpand;
         private NumericUpDown _numExpandLimit;
         private bool _expandLimitManaged;
+        private RadioButton[] _sortOptions;
         private CheckBox _chkEnableSearch;
         private CheckBox _chkFocusSearch;
         private bool _focusSearchManaged;
@@ -87,7 +88,7 @@ namespace trutility
             }
 
             AddPage("General", BuildUserGroup(), BuildSettingsGroup());
-            AddPage("Advanced", BuildAdvancedSettings());
+            AddPage("Advanced", BuildAdvancedSettings(), BuildSortingGroup());
             AddPage("About", BuildHeader(), BuildHelpGroup());
 
             // What the tab strip and the border take up around a page.
@@ -358,6 +359,34 @@ namespace trutility
             return stack;
         }
 
+        private Control BuildSortingGroup()
+        {
+            // In MenuSort order, so a button's position is the value it stands for.
+            _sortOptions = new[]
+            {
+                new RadioButton { Text = "Sort by name", AutoSize = true },
+                new RadioButton { Text = "Sort by date (newest first)", AutoSize = true },
+                new RadioButton { Text = "Sort by file extension", AutoSize = true },
+            };
+
+            // A stored value that is none of the three is shown as name, which
+            // is also how the menu treats it.
+            int current = NumberSetting.SortBy.Value();
+            _sortOptions[current < _sortOptions.Length ? current : 0].Checked = true;
+
+            FlowLayoutPanel stack = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                Enabled = !NumberSetting.SortBy.IsManagedByPolicy(),
+            };
+            stack.Controls.AddRange(_sortOptions);
+            return NewGroup(
+                stack.Enabled ? "Sorting" : "Sorting   [Managed by Administrator]", stack);
+        }
+
         /// Treat zero or empty as "not set" and fall back to the default
         private int ExpandLimit()
         {
@@ -538,6 +567,12 @@ namespace trutility
             // the focus choice below: it should still be there when expanding
             // is turned back on.
             if (!_expandLimitManaged && NumberSetting.AutoExpandLimit.SaveIfChanged(ExpandLimit()))
+            {
+                MenuNeedsRebuild = true;
+            }
+
+            if (!NumberSetting.SortBy.IsManagedByPolicy()
+                && NumberSetting.SortBy.SaveIfChanged(Array.FindIndex(_sortOptions, o => o.Checked)))
             {
                 MenuNeedsRebuild = true;
             }
