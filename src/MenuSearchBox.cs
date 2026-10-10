@@ -80,11 +80,12 @@ namespace trutility
             _box.TextChanged += (s, e) => OnTextChanged();
             _box.KeyDown += OnKeyDown;
 
-            // Without this the menu treats Enter, Esc and Down as its own
+            // Without this the menu treats Enter, Esc and the arrows as its own
             // navigation keys and they never reach the box.
             _box.TextBox.PreviewKeyDown += (s, e) =>
             {
                 if (e.KeyCode == Keys.Enter || e.KeyCode == Keys.Down
+                    || e.KeyCode == Keys.Up || e.KeyCode == Keys.Right
                     || (e.KeyCode == Keys.Escape && _box.Text.Length > 0))
                 {
                     e.IsInputKey = true;
@@ -346,18 +347,61 @@ namespace trutility
         }
 
         /// <summary>
-        /// Enter launches the best match and Shift+Enter launches it as
-        /// administrator, the same as Shift+Click. Esc clears the box, and a
-        /// second Esc closes the menu as usual. Down moves into the list.
+        /// The keyboard never leaves the box, so the box moves the highlight
+        /// itself: Up and Down walk every entry of the menu, tree or results,
+        /// and wrap at the ends. Enter launches the highlighted entry, or the
+        /// best match when nothing is highlighted, and Shift+Enter launches it
+        /// as administrator, the same as Shift+Click. Enter or Right on a
+        /// folder opens it. Esc clears the box, and a second Esc closes the
+        /// menu as usual.
         /// </summary>
         internal bool HandleKey(Keys keyData)
         {
             Keys key = keyData & Keys.KeyCode;
             bool shift = (keyData & Keys.Shift) != 0;
 
-            if (key == Keys.Enter || key == Keys.Down)
+            if (key == Keys.Enter || key == Keys.Down || key == Keys.Up)
             {
                 FlushPending();
+            }
+
+            // Always swallowed, or the arrow would move the caret instead.
+            if (key == Keys.Down || key == Keys.Up)
+            {
+                MoveHighlight(key == Keys.Down ? 1 : -1);
+                return true;
+            }
+
+            ToolStripItem highlighted = Stops().Find(i => i.Selected);
+            ToolStripMenuItem folder = highlighted as ToolStripMenuItem;
+            if ((key == Keys.Enter || key == Keys.Right) && folder != null && folder.HasDropDownItems)
+            {
+                // An open submenu is its own window with nothing focused in
+                // it, so from here the menu's own keys take over - Left
+                // closes it and brings them back to the box.
+                folder.ShowDropDown();
+                foreach (ToolStripItem item in folder.DropDownItems)
+                {
+                    if (IsStop(item))
+                    {
+                        item.Select();
+                        break;
+                    }
+                }
+                return true;
+            }
+
+            if (key == Keys.Enter && highlighted != null)
+            {
+                string highlightedPath = highlighted.Tag as string;
+                if (highlightedPath == null)
+                {
+                    highlighted.PerformClick();   // Settings, Exit
+                    return true;
+                }
+                _menu.Close();
+                _launch(highlightedPath, shift);
+                return true;
             }
 
             if (key == Keys.Enter && _hits.Count > 0)
@@ -374,20 +418,39 @@ namespace trutility
                 return true;
             }
 
-            if (key == Keys.Down)
+            return false;
+        }
+
+        private static bool IsStop(ToolStripItem item)
+        {
+            return item.Enabled && item.CanSelect && !(item is ToolStripSeparator);
+        }
+
+        /// Everything under the box the highlight can land on, top to bottom.
+        private List<ToolStripItem> Stops()
+        {
+            List<ToolStripItem> stops = new List<ToolStripItem>();
+            for (int i = _contentStart; i < _menu.Items.Count; i++)
             {
-                for (int i = _contentStart; i < _menu.Items.Count; i++)
+                if (IsStop(_menu.Items[i]))
                 {
-                    ToolStripItem item = _menu.Items[i];
-                    if (item.Enabled && item.CanSelect && !(item is ToolStripSeparator))
-                    {
-                        item.Select();
-                        return true;
-                    }
+                    stops.Add(_menu.Items[i]);
                 }
             }
+            return stops;
+        }
 
-            return false;
+        /// With nothing highlighted, Down starts at the top and Up at the bottom.
+        private void MoveHighlight(int step)
+        {
+            List<ToolStripItem> stops = Stops();
+            if (stops.Count == 0) return;
+
+            int at = stops.FindIndex(i => i.Selected);
+            int next = at < 0
+                ? (step > 0 ? 0 : stops.Count - 1)
+                : (at + step + stops.Count) % stops.Count;
+            stops[next].Select();
         }
 
         private void SetCueBanner()
