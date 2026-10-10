@@ -336,7 +336,7 @@ namespace trutility
             // In MenuSort order, so a button's position is the value it stands for.
             _sortOptions = new[]
             {
-                new RadioButton { Text = "Sort by name", AutoSize = true },
+                new RadioButton { Text = "Sort by name (A to Z)", AutoSize = true },
                 new RadioButton { Text = "Sort by date (newest first)", AutoSize = true },
                 new RadioButton { Text = "Sort by file extension", AutoSize = true },
             };
