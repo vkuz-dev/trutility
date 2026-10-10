@@ -737,7 +737,7 @@ namespace trutility
         /// of entry, or the user said yes.
         private static bool ConfirmDelete(ToggleSetting kind, string question, string path)
         {
-            if (!ToggleSetting.ConfirmDelete.IsOn() || !kind.IsOn()) return true;
+            if (!kind.IsOn()) return true;
 
             return MessageBox.Show(
                 $"{question}\n\n{path}\n\nIt will be sent to the Recycle Bin.",

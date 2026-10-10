@@ -36,7 +36,6 @@ namespace trutility
         private NumericUpDown _numSearchDelay;
         private bool _searchDelayManaged;
         private bool _focusSearchManaged;
-        private CheckBox _chkConfirm;
         private CheckBox _chkConfirmFiles;
         private CheckBox _chkConfirmFolders;
         private bool _confirmFilesManaged;
@@ -314,12 +313,12 @@ namespace trutility
                 ToggleSetting.ShowExtensions.IsOn(), ToggleSetting.ShowExtensions.IsManagedByPolicy());
 
             _chkExpand = NewSetting(
-                "Expand folder shortcuts by default",
+                "Automatically expand folder shortcuts",
                 ToggleSetting.ExpandFolderShortcuts.IsOn(), ToggleSetting.ExpandFolderShortcuts.IsManagedByPolicy());
 
             _expandLimitManaged = NumberSetting.AutoExpandLimit.IsManagedByPolicy();
             _numExpandLimit = NewNumberBox(NumberSetting.AutoExpandLimit, 100000); //max value
-            Control limitRow = NewNumberRow(_numExpandLimit, "Folder item limit (append $F to ignore)");
+            Control limitRow = NewNumberRow(_numExpandLimit, "Auto-expand folders up to this many items ($F ignores this)");
 
             // The limit only means something while shortcuts expand on their own.
             _chkExpand.CheckedChanged += (s, e) => UpdateExpandLimitAvailability();
@@ -339,33 +338,17 @@ namespace trutility
 
         private void AddConfirmSettings(FlowLayoutPanel stack)
         {
-            _chkConfirm = NewSetting(
-                "Ask for confirmation when:",
-                ToggleSetting.ConfirmDelete.IsOn(), ToggleSetting.ConfirmDelete.IsManagedByPolicy());
-
             _confirmFilesManaged = ToggleSetting.ConfirmDeleteFiles.IsManagedByPolicy();
             _chkConfirmFiles = NewSetting(
-                "Deleting files",
+                "Ask for confirmation when deleting files",
                 ToggleSetting.ConfirmDeleteFiles.IsOn(), _confirmFilesManaged);
 
             _confirmFoldersManaged = ToggleSetting.ConfirmDeleteFolders.IsManagedByPolicy();
             _chkConfirmFolders = NewSetting(
-                "Deleting folders",
+                "Ask for confirmation when deleting folders",
                 ToggleSetting.ConfirmDeleteFolders.IsOn(), _confirmFoldersManaged);
 
-            // Indented, to show they belong to the checkbox above them.
-            _chkConfirmFiles.Margin = _chkConfirmFolders.Margin = new Padding(22, 3, 3, 3);
-
-            _chkConfirm.CheckedChanged += (s, e) => UpdateConfirmAvailability();
-            UpdateConfirmAvailability();
-
-            stack.Controls.AddRange(new Control[] { _chkConfirm, _chkConfirmFiles, _chkConfirmFolders });
-        }
-
-        private void UpdateConfirmAvailability()
-        {
-            _chkConfirmFiles.Enabled = !_confirmFilesManaged && _chkConfirm.Checked;
-            _chkConfirmFolders.Enabled = !_confirmFoldersManaged && _chkConfirm.Checked;
+            stack.Controls.AddRange(new Control[] { _chkConfirmFiles, _chkConfirmFolders });
         }
 
         private Control BuildSortingGroup()
@@ -673,12 +656,7 @@ namespace trutility
                 ToggleSetting.FocusSearch.SaveIfChanged(_chkFocusSearch.Checked);
             }
 
-            // Read at the moment of deleting, so no rebuild. The two under the
-            // main checkbox are saved while greyed out too, like the focus choice.
-            if (_chkConfirm.Enabled)
-            {
-                ToggleSetting.ConfirmDelete.SaveIfChanged(_chkConfirm.Checked);
-            }
+            // Read at the moment of deleting, so no rebuild.
             if (!_confirmFilesManaged)
             {
                 ToggleSetting.ConfirmDeleteFiles.SaveIfChanged(_chkConfirmFiles.Checked);

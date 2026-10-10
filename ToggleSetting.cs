@@ -45,10 +45,6 @@ namespace trutility.Settings
         /// below them. Off by default.
         public static readonly ToggleSetting FoldersFirst = new ToggleSetting("FoldersFirst", false);
 
-        /// Whether Ctrl+Click ever asks before deleting. On by default. Turned
-        /// off, nothing asks, whatever the two choices under it say.
-        public static readonly ToggleSetting ConfirmDelete = new ToggleSetting("ConfirmDelete", true);
-
         /// Whether deleting a file or a shortcut asks first. On by default.
         public static readonly ToggleSetting ConfirmDeleteFiles = new ToggleSetting("ConfirmDeleteFiles", true);
 
