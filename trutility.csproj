@@ -8,7 +8,7 @@
     <OutputType>WinExe</OutputType>
 
     <Product>trutility</Product>
-    <Copyright>© 2026 Vladimirs Kuznecovs</Copyright>
+    <Copyright>© 2026 Vladimir Kuznetsov</Copyright>
 
     <AssemblyName>trutility</AssemblyName>
     <AssemblyTitle>trutility</AssemblyTitle>
@@ -17,7 +17,7 @@
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
 
     <!-- VERSIONING -->
-    <Version>2.0.1.0</Version>
+    <Version>2.0.2.0</Version>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>

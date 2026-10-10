@@ -521,7 +521,7 @@ namespace trutility
         {
             if (child.Children.Count == 0) return;
 
-            ToolStripMenuItem subMenu = new ToolStripMenuItem(child.Name);
+            ToolStripMenuItem subMenu = new HoverMenuItem(child.Name);
             PopulateMenu(subMenu.DropDownItems, child);
             subMenu.DropDownOpening += (s, e) => FillIcons(subMenu.DropDownItems);
             items.Add(subMenu);
@@ -576,7 +576,7 @@ namespace trutility
 
             // The path rides along so FillIcons can resolve the image when this
             // level of the menu is actually opened.
-            ToolStripMenuItem item = new ToolStripMenuItem(child.Name)
+            ToolStripMenuItem item = new HoverMenuItem(child.Name)
             {
                 Tag = filePath,
             };
@@ -619,11 +619,11 @@ namespace trutility
         {
             menu.Items.Add(new ToolStripSeparator());
 
-            ToolStripMenuItem about = new ToolStripMenuItem("About / Settings");
+            ToolStripMenuItem about = new HoverMenuItem("About / Settings");
             about.Click += OnAbout;
             menu.Items.Add(about);
 
-            ToolStripMenuItem exit = new ToolStripMenuItem("Exit");
+            ToolStripMenuItem exit = new HoverMenuItem("Exit");
             exit.Click += (s, e) => Application.Exit();
             menu.Items.Add(exit);
         }
