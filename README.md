@@ -4,6 +4,8 @@ A minimal Windows system-tray launcher. C# / .NET Framework 4.6.2, WinForms, no 
 
 Put files, shortcuts or folders in a watched folder and they become a tray menu. The folder structure *is* the menu structure.
 
+Built with AI assistance. I design the features, read the diffs and test every release myself. Found a problem? [Open an issue](https://github.com/vkuz-dev/trutility/issues).
+
 ## Folders
 
 trutility scans two kinds of folder:
