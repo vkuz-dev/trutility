@@ -25,6 +25,9 @@ namespace trutility
         private CheckBox _chkStartup;
         private CheckBox _chkTrayPin;
         private CheckBox _chkExtensions;
+        private CheckBox _chkExpand;
+        private NumericUpDown _numExpandLimit;
+        private bool _expandLimitManaged;
         private CheckBox _chkEnableSearch;
         private CheckBox _chkFocusSearch;
         private bool _focusSearchManaged;
@@ -295,7 +298,74 @@ namespace trutility
             _chkExtensions = NewSetting(
                 "Show file extensions",
                 ToggleSetting.ShowExtensions.IsOn(), ToggleSetting.ShowExtensions.IsManagedByPolicy());
-            return _chkExtensions;
+
+            _chkExpand = NewSetting(
+                "Expand folder shortcuts by default",
+                ToggleSetting.ExpandFolderShortcuts.IsOn(), ToggleSetting.ExpandFolderShortcuts.IsManagedByPolicy());
+
+            _expandLimitManaged = NumberSetting.AutoExpandLimit.IsManagedByPolicy();
+            _numExpandLimit = new NumericUpDown
+            {
+                Minimum = 0,
+                Maximum = 100000,
+                Width = 50,
+                Anchor = AnchorStyles.Left,
+            };
+            _numExpandLimit.Value = Math.Min(_numExpandLimit.Maximum, NumberSetting.AutoExpandLimit.Value());
+
+            // Shown as soon as the box is left, so what OK will save is never
+            // a surprise.
+            _numExpandLimit.Leave += (s, e) =>
+            {
+                int limit = ExpandLimit();
+                _numExpandLimit.Value = limit;
+                _numExpandLimit.Text = limit.ToString();
+            };
+
+            // Anchored to neither top nor bottom, which is what centres it on
+            // the box beside it.
+            Label limitLabel = new Label
+            {
+                Text = "Folder item limit (append $F to ignore)",
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+            };
+
+            FlowLayoutPanel limitRow = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Margin = Padding.Empty,
+            };
+            limitRow.Controls.AddRange(new Control[] { _numExpandLimit, limitLabel });
+
+            // The limit only means something while shortcuts expand on their own.
+            _chkExpand.CheckedChanged += (s, e) => UpdateExpandLimitAvailability();
+            UpdateExpandLimitAvailability();
+
+            FlowLayoutPanel stack = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+            };
+            stack.Controls.AddRange(new Control[] { _chkExtensions, _chkExpand, limitRow });
+            return stack;
+        }
+
+        /// Treat zero or empty as "not set" and fall back to the default
+        private int ExpandLimit()
+        {
+            bool unset = _numExpandLimit.Text.Trim().Length == 0 || _numExpandLimit.Value == 0;
+            return unset ? NumberSetting.AutoExpandLimit.Default : (int)_numExpandLimit.Value;
+        }
+
+        private void UpdateExpandLimitAvailability()
+        {
+            _numExpandLimit.Enabled = !_expandLimitManaged && _chkExpand.Checked;
         }
 
         private void UpdateFocusSearchAvailability()
@@ -429,6 +499,19 @@ namespace trutility
                 MenuNeedsRebuild = true;
             }
             if (_chkEnableSearch.Enabled && ToggleSetting.EnableSearch.SaveIfChanged(_chkEnableSearch.Checked))
+            {
+                MenuNeedsRebuild = true;
+            }
+
+            if (_chkExpand.Enabled && ToggleSetting.ExpandFolderShortcuts.SaveIfChanged(_chkExpand.Checked))
+            {
+                MenuNeedsRebuild = true;
+            }
+
+            // The limit is saved while greyed out too, for the same reason as
+            // the focus choice below: it should still be there when expanding
+            // is turned back on.
+            if (!_expandLimitManaged && NumberSetting.AutoExpandLimit.SaveIfChanged(ExpandLimit()))
             {
                 MenuNeedsRebuild = true;
             }

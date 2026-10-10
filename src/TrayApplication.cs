@@ -341,7 +341,8 @@ namespace trutility
             List<string> followedFolders;
             MenuNode tree = MenuBuilder.BuildTree(
                 globalRoots, userRoot, out accessErrors, out followedFolders,
-                ToggleSetting.ShowExtensions.IsOn());
+                ToggleSetting.ShowExtensions.IsOn(),
+                ToggleSetting.ExpandFolderShortcuts.IsOn() ? NumberSetting.AutoExpandLimit.Value() : 0);
 
             // Read once here so the index and the box always agree: no index
             // means no box, and a menu without search costs nothing for it.

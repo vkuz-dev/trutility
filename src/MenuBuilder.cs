@@ -98,6 +98,10 @@ namespace trutility
             public IReadOnlyList<Root> AllRoots;
             public IReadOnlyList<string> ForeignRoots;
             public bool ShowExtensions;
+
+            /// The most items a folder may hold and still be expanded through an
+            /// unmarked shortcut. Zero means unmarked shortcuts never expand.
+            public int AutoExpandLimit;
         }
 
         /// <summary>
@@ -116,7 +120,7 @@ namespace trutility
         /// </summary>
         public static MenuNode BuildTree(IReadOnlyList<Root> globalRoots, Root userRoot,
                                          out List<string> accessErrors, out List<string> followedFolders,
-                                         bool showExtensions = true)
+                                         bool showExtensions = true, int autoExpandLimit = 0)
         {
             List<Root> allRoots = new List<Root>(globalRoots ?? new Root[0]);
             if (userRoot != null)
@@ -131,6 +135,7 @@ namespace trutility
                 VisitedFolders = SeedVisitedFolders(allRoots),
                 AllRoots = allRoots,
                 ShowExtensions = showExtensions,
+                AutoExpandLimit = autoExpandLimit,
             };
             accessErrors = context.AccessErrors;
             followedFolders = context.FollowedFolders;
@@ -325,19 +330,29 @@ namespace trutility
 
                     // $X on a shortcut implies $F: promoting the children of a
                     // target means following it first, so it never needs both.
-                    if ((parsed.Follow || parsed.Flatten)
-                        && LinkExtensions.Contains(Path.GetExtension(fileName)))
+                    bool isLink = LinkExtensions.Contains(Path.GetExtension(fileName));
+                    if ((parsed.Follow || parsed.Flatten) && isLink)
                     {
                         // A $F link is a folder expansion, not an entry. When the
                         // target cannot be expanded - offline share, denied ACL,
                         // already on the menu, or inside another root - nothing is
                         // shown, rather than a dead item that errors when clicked.
-                        MenuNode followed = TryFollow(file, parsed, context);
+                        MenuNode followed = TryFollow(file, parsed, context, limit: 0);
                         if (followed != null)
                         {
                             folderNodes.Add(followed);
                         }
                         continue;
+                    }
+
+                    if (isLink && context.AutoExpandLimit > 0)
+                    {
+                        MenuNode expanded = TryFollow(file, parsed, context, context.AutoExpandLimit);
+                        if (expanded != null)
+                        {
+                            folderNodes.Add(expanded);
+                            continue;
+                        }
                     }
 
                     fileNodes.Add(new MenuNode(parsed.DisplayName, parsed.SepBefore, parsed.SepAfter)
@@ -383,10 +398,11 @@ namespace trutility
         }
 
         /// <summary>
-        /// Expands a $F shortcut into a submenu, or returns null when it must not
-        /// be followed.
+        /// Expands a shortcut to a folder into a submenu, or returns null when it
+        /// must not be followed. A limit above zero also refuses a folder holding
+        /// more items than that; zero, for a shortcut marked $F, follows any size.
         /// </summary>
-        private static MenuNode TryFollow(string linkPath, ParsedName parsed, ScanContext context)
+        private static MenuNode TryFollow(string linkPath, ParsedName parsed, ScanContext context, int limit)
         {
             string target;
             if (!ShortcutLib.TryResolveTarget(linkPath, out target) || !Directory.Exists(target))
@@ -408,6 +424,13 @@ namespace trutility
                 return null;
             }
 
+            // Checked before the folder is marked as visited, so one that is
+            // turned down here can still be reached by a $F shortcut elsewhere.
+            if (limit > 0 && !IsWithinLimit(target, limit))
+            {
+                return null;
+            }
+
             if (!context.VisitedFolders.Add(normalizedTarget))
             {
                 return null;
@@ -422,6 +445,25 @@ namespace trutility
             context.FollowedFolders.Add(target);
 
             return node.Children.Count > 0 ? node : null;
+        }
+
+        /// <summary>
+        /// Counts everything under a folder, giving up one past the limit so a
+        /// whole drive costs no more to turn down than a small folder does to
+        /// accept. A folder that cannot be read all the way through is turned
+        /// down too.
+        /// </summary>
+        private static bool IsWithinLimit(string folder, int limit)
+        {
+            try
+            {
+                return Directory.EnumerateFileSystemEntries(folder, "*", SearchOption.AllDirectories)
+                    .Take(limit + 1).Count() <= limit;
+            }
+            catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException)
+            {
+                return false;
+            }
         }
 
         private static bool IsInsideForeignRoot(string normalizedTarget, ScanContext context)

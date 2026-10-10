@@ -30,6 +30,13 @@ namespace trutility.Settings
         /// </summary>
         public static readonly ToggleSetting FocusSearch = new ToggleSetting("FocusSearch", false);
 
+        /// <summary>
+        /// Whether a shortcut to a folder opens as a submenu without $F in its
+        /// name. On by default, up to the size NumberSetting.AutoExpandLimit
+        /// allows. Turned off, only shortcuts marked $F or $X expand
+        /// </summary>
+        public static readonly ToggleSetting ExpandFolderShortcuts = new ToggleSetting("ExpandFolderShortcuts", true);
+
         private const string RegKeyPath = @"SOFTWARE\trutility";
 
         private readonly string _valueName;
