@@ -37,6 +37,14 @@ namespace trutility.Settings
         /// </summary>
         public static readonly ToggleSetting ExpandFolderShortcuts = new ToggleSetting("ExpandFolderShortcuts", true);
 
+        /// Whether the chosen order is turned around: Z to A, oldest first.
+        /// Off by default.
+        public static readonly ToggleSetting ReverseSort = new ToggleSetting("ReverseSort", false);
+
+        /// Whether submenus are listed above the files of a folder instead of
+        /// below them. Off by default.
+        public static readonly ToggleSetting FoldersFirst = new ToggleSetting("FoldersFirst", false);
+
         private const string RegKeyPath = @"SOFTWARE\trutility";
 
         private readonly string _valueName;

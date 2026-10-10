@@ -112,6 +112,8 @@ namespace trutility
             /// unmarked shortcut. Zero means unmarked shortcuts never expand.
             public int AutoExpandLimit;
             public MenuSort Sort;
+            public bool ReverseSort;
+            public bool FoldersFirst;
         }
 
         /// <summary>
@@ -131,7 +133,8 @@ namespace trutility
         public static MenuNode BuildTree(IReadOnlyList<Root> globalRoots, Root userRoot,
                                          out List<string> accessErrors, out List<string> followedFolders,
                                          bool showExtensions = true, int autoExpandLimit = 0,
-                                         MenuSort sort = MenuSort.Name)
+                                         MenuSort sort = MenuSort.Name, bool reverseSort = false,
+                                         bool foldersFirst = false)
         {
             List<Root> allRoots = new List<Root>(globalRoots ?? new Root[0]);
             if (userRoot != null)
@@ -148,6 +151,8 @@ namespace trutility
                 ShowExtensions = showExtensions,
                 AutoExpandLimit = autoExpandLimit,
                 Sort = sort,
+                ReverseSort = reverseSort,
+                FoldersFirst = foldersFirst,
             };
             accessErrors = context.AccessErrors;
             followedFolders = context.FollowedFolders;
@@ -280,26 +285,30 @@ namespace trutility
             // Followed shortcuts are discovered during the files pass, so re-sort
             // to keep folder ordering alphabetical regardless of which pass found them.
             folderNodes = folderNodes.OrderBy(n => n.Name, StringComparer.OrdinalIgnoreCase).ToList();
+            if (context.ReverseSort)
+            {
+                folderNodes.Reverse();
+            }
 
-            // ── Populate node: files → [divider] → folders ────────────────────
-            List<MenuNode> rendered = new List<MenuNode>();
-            rendered.AddRange(fileNodes);
-
-            int firstFolder = rendered.Count;
+            List<MenuNode> folderEntries = new List<MenuNode>();
             foreach (MenuNode d in folderNodes)
             {
-                AppendFolder(rendered, d);
+                AppendFolder(folderEntries, d);
             }
+
+            // ── Populate node: files → [divider] → folders, or the other way ──
+            List<MenuNode> first = context.FoldersFirst ? folderEntries : fileNodes;
+            List<MenuNode> second = context.FoldersFirst ? fileNodes : folderEntries;
 
             // The rule is "a divider between files and folders", so it belongs on
-            // whatever ends up first among them - which for a flattened folder is
+            // whatever starts the second group - which for a flattened folder is
             // one of its promoted children, not the folder itself.
-            if (fileNodes.Count > 0 && rendered.Count > firstFolder)
+            if (first.Count > 0 && second.Count > 0)
             {
-                rendered[firstFolder].SeparatorBefore = true;
+                second[0].SeparatorBefore = true;
             }
 
-            foreach (MenuNode child in rendered)
+            foreach (MenuNode child in first.Concat(second))
             {
                 node.AddChild(child);
             }
@@ -329,7 +338,8 @@ namespace trutility
         {
             try
             {
-                foreach (string file in SortFiles(Directory.GetFiles(directory), context.Sort))
+                IEnumerable<string> files = SortFiles(Directory.GetFiles(directory), context.Sort);
+                foreach (string file in context.ReverseSort ? files.Reverse() : files)
                 {
                     string fileName = Path.GetFileName(file);
                     if (IgnoredFileNames.Contains(fileName) || string.IsNullOrWhiteSpace(fileName))

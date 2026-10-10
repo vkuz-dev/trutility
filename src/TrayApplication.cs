@@ -343,7 +343,8 @@ namespace trutility
                 globalRoots, userRoot, out accessErrors, out followedFolders,
                 ToggleSetting.ShowExtensions.IsOn(),
                 ToggleSetting.ExpandFolderShortcuts.IsOn() ? NumberSetting.AutoExpandLimit.Value() : 0,
-                (MenuSort)NumberSetting.SortBy.Value());
+                (MenuSort)NumberSetting.SortBy.Value(),
+                ToggleSetting.ReverseSort.IsOn(), ToggleSetting.FoldersFirst.IsOn());
 
             // Read once here so the index and the box always agree: no index
             // means no box, and a menu without search costs nothing for it.

@@ -29,6 +29,8 @@ namespace trutility
         private NumericUpDown _numExpandLimit;
         private bool _expandLimitManaged;
         private RadioButton[] _sortOptions;
+        private CheckBox _chkReverseSort;
+        private CheckBox _chkFoldersFirst;
         private CheckBox _chkEnableSearch;
         private CheckBox _chkFocusSearch;
         private NumericUpDown _numSearchDelay;
@@ -280,7 +282,7 @@ namespace trutility
                 ToggleSetting.FocusSearch.IsOn(), _focusSearchManaged);
 
             _searchDelayManaged = NumberSetting.SearchDelayMs.IsManagedByPolicy();
-            _numSearchDelay = NewNumberBox(NumberSetting.SearchDelayMs, 10000);
+            _numSearchDelay = NewNumberBox(NumberSetting.SearchDelayMs, 10000); // max value
             Control delayRow = NewNumberRow(_numSearchDelay, "Search delay after typing, in milliseconds");
 
             _chkEnableSearch.CheckedChanged += (s, e) => UpdateSearchAvailability();
@@ -311,7 +313,7 @@ namespace trutility
                 ToggleSetting.ExpandFolderShortcuts.IsOn(), ToggleSetting.ExpandFolderShortcuts.IsManagedByPolicy());
 
             _expandLimitManaged = NumberSetting.AutoExpandLimit.IsManagedByPolicy();
-            _numExpandLimit = NewNumberBox(NumberSetting.AutoExpandLimit, 100000);
+            _numExpandLimit = NewNumberBox(NumberSetting.AutoExpandLimit, 100000); //max value
             Control limitRow = NewNumberRow(_numExpandLimit, "Folder item limit (append $F to ignore)");
 
             // The limit only means something while shortcuts expand on their own.
@@ -344,17 +346,38 @@ namespace trutility
             int current = NumberSetting.SortBy.Value();
             _sortOptions[current < _sortOptions.Length ? current : 0].Checked = true;
 
+            // The three choices are managed as one, so they share a panel that
+            // is greyed out whole. The checkboxes under them each follow their
+            // own policy and sit outside it.
+            FlowLayoutPanel choices = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+                Margin = Padding.Empty,
+                Enabled = !NumberSetting.SortBy.IsManagedByPolicy(),
+            };
+            choices.Controls.AddRange(_sortOptions);
+
+            _chkReverseSort = NewSetting(
+                "Reverse order",
+                ToggleSetting.ReverseSort.IsOn(), ToggleSetting.ReverseSort.IsManagedByPolicy());
+
+            _chkFoldersFirst = NewSetting(
+                "Folders before files",
+                ToggleSetting.FoldersFirst.IsOn(), ToggleSetting.FoldersFirst.IsManagedByPolicy());
+
             FlowLayoutPanel stack = new FlowLayoutPanel
             {
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
-                Enabled = !NumberSetting.SortBy.IsManagedByPolicy(),
             };
-            stack.Controls.AddRange(_sortOptions);
+            stack.Controls.AddRange(new Control[] { choices, _chkReverseSort, _chkFoldersFirst });
             return NewGroup(
-                stack.Enabled ? "Sorting" : "Sorting   [Managed by Administrator]", stack);
+                choices.Enabled ? "Sorting" : "Sorting   [Managed by Administrator]", stack);
         }
 
         /// A box for a numeric setting, starting at its current value.
@@ -593,6 +616,14 @@ namespace trutility
 
             if (!NumberSetting.SortBy.IsManagedByPolicy()
                 && NumberSetting.SortBy.SaveIfChanged(Array.FindIndex(_sortOptions, o => o.Checked)))
+            {
+                MenuNeedsRebuild = true;
+            }
+            if (_chkReverseSort.Enabled && ToggleSetting.ReverseSort.SaveIfChanged(_chkReverseSort.Checked))
+            {
+                MenuNeedsRebuild = true;
+            }
+            if (_chkFoldersFirst.Enabled && ToggleSetting.FoldersFirst.SaveIfChanged(_chkFoldersFirst.Checked))
             {
                 MenuNeedsRebuild = true;
             }
