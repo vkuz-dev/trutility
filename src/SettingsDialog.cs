@@ -268,9 +268,8 @@ namespace trutility
                 "Enable \"Add to trutility\" in Explorer context menu",
                 TrayApplication.IsShellVerbEnabled(), shellManaged);
 
-            bool globalStartup = SettingsStartup.IsGlobalStartupEnabled();
             _chkStartup = NewSetting(
-                "Run at startup", SettingsStartup.IsStartupEnabled(), globalStartup);
+                "Run at startup", ShortcutSetting.Startup.IsEnabled(), ShortcutSetting.Startup.IsGlobal());
 
             bool trayPinManaged = SettingsTrayPin.IsManagedByPolicy();
             _chkTrayPin = NewSetting(
@@ -604,7 +603,7 @@ namespace trutility
                 else { TrayApplication.UnregisterShellVerb(); TrayApplication.SaveShellPref(false); }
             }
 
-            SettingsStartup.SetStartup(_chkStartup.Checked);
+            ShortcutSetting.Startup.Set(_chkStartup.Checked);
 
             if (_chkTrayPin.Enabled)
                 SettingsTrayPin.SaveTrayPin(_chkTrayPin.Checked);

@@ -5,15 +5,31 @@ using System.Runtime.InteropServices;
 
 namespace trutility.Settings
 {
-    public static class SettingsStartup
+    /// <summary>
+    /// A shortcut to trutility in one of the user's shell folders. The
+    /// shortcut being there is the setting - nothing is kept in the registry.
+    /// The same shortcut in the matching all-users folder is the
+    /// administrator's, and decides it for everyone on the machine.
+    /// </summary>
+    public sealed class ShortcutSetting
     {
+        public static readonly ShortcutSetting Startup = new ShortcutSetting(
+            Environment.SpecialFolder.Startup, Environment.SpecialFolder.CommonStartup);
+
+        private readonly Environment.SpecialFolder _userFolder;
+        private readonly Environment.SpecialFolder _globalFolder;
+
+        private ShortcutSetting(Environment.SpecialFolder userFolder, Environment.SpecialFolder globalFolder)
+        {
+            _userFolder = userFolder;
+            _globalFolder = globalFolder;
+        }
+
         // ── Folder helpers ────────────────────────────────────────────────────
 
-        private static string UserStartupFolder =>
-            Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+        private string UserFolder => Environment.GetFolderPath(_userFolder);
 
-        private static string GlobalStartupFolder =>
-            Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup);
+        private string GlobalFolder => Environment.GetFolderPath(_globalFolder);
 
         private static string AppProcessPath =>
             Process.GetCurrentProcess().MainModule.FileName;
@@ -23,34 +39,36 @@ namespace trutility.Settings
 
         // ── Public API ────────────────────────────────────────────────────────
 
-        public static bool IsStartupEnabled()
+        public bool IsEnabled()
         {
-            return FindExistingShortcut(UserStartupFolder) != null
-                || FindExistingShortcut(GlobalStartupFolder) != null;
+            return FindExistingShortcut(UserFolder) != null
+                || FindExistingShortcut(GlobalFolder) != null;
         }
 
-        public static bool IsGlobalStartupEnabled()
+        /// True when the administrator has put the shortcut in the all-users
+        /// folder, which the user can neither remove nor needs to duplicate.
+        public bool IsGlobal()
         {
-            return FindExistingShortcut(GlobalStartupFolder) != null;
+            return FindExistingShortcut(GlobalFolder) != null;
         }
 
-        public static void SetStartup(bool enable)
+        public void Set(bool enable)
         {
-            if (IsGlobalStartupEnabled())
+            if (IsGlobal())
             {
-                RemoveShortcutsIn(UserStartupFolder);
+                RemoveShortcutsIn(UserFolder);
                 return;
             }
 
             if (enable)
             {
-                RemoveShortcutsIn(UserStartupFolder);   // clean up stale entries
-                string lnkPath = Path.Combine(UserStartupFolder, AppBaseName + ".lnk");
+                RemoveShortcutsIn(UserFolder);   // clean up stale entries
+                string lnkPath = Path.Combine(UserFolder, AppBaseName + ".lnk");
                 CreateShortcut(lnkPath, AppProcessPath);
             }
             else
             {
-                RemoveShortcutsIn(UserStartupFolder);
+                RemoveShortcutsIn(UserFolder);
             }
         }
 
