@@ -36,6 +36,11 @@ namespace trutility
         private NumericUpDown _numSearchDelay;
         private bool _searchDelayManaged;
         private bool _focusSearchManaged;
+        private CheckBox _chkConfirm;
+        private CheckBox _chkConfirmFiles;
+        private CheckBox _chkConfirmFolders;
+        private bool _confirmFilesManaged;
+        private bool _confirmFoldersManaged;
         private readonly Action _refreshMenu;
         private readonly Action _rebuildMenu;
 
@@ -244,7 +249,7 @@ namespace trutility
                 WrapContents = false,
             };
 
-            Button change = new Button { Text = "Change…", AutoSize = true, Enabled = !managed };
+            Button change = new Button { Text = "Change", AutoSize = true, Enabled = !managed };
             change.Click += OnChangeUserRoot;
 
             Button reset = new Button { Text = "Reset", AutoSize = true, Enabled = !managed };
@@ -328,7 +333,39 @@ namespace trutility
                 WrapContents = false,
             };
             stack.Controls.AddRange(new Control[] { _chkExtensions, _chkExpand, limitRow });
+            AddConfirmSettings(stack);
             return stack;
+        }
+
+        private void AddConfirmSettings(FlowLayoutPanel stack)
+        {
+            _chkConfirm = NewSetting(
+                "Ask for confirmation when:",
+                ToggleSetting.ConfirmDelete.IsOn(), ToggleSetting.ConfirmDelete.IsManagedByPolicy());
+
+            _confirmFilesManaged = ToggleSetting.ConfirmDeleteFiles.IsManagedByPolicy();
+            _chkConfirmFiles = NewSetting(
+                "Deleting files",
+                ToggleSetting.ConfirmDeleteFiles.IsOn(), _confirmFilesManaged);
+
+            _confirmFoldersManaged = ToggleSetting.ConfirmDeleteFolders.IsManagedByPolicy();
+            _chkConfirmFolders = NewSetting(
+                "Deleting folders",
+                ToggleSetting.ConfirmDeleteFolders.IsOn(), _confirmFoldersManaged);
+
+            // Indented, to show they belong to the checkbox above them.
+            _chkConfirmFiles.Margin = _chkConfirmFolders.Margin = new Padding(22, 3, 3, 3);
+
+            _chkConfirm.CheckedChanged += (s, e) => UpdateConfirmAvailability();
+            UpdateConfirmAvailability();
+
+            stack.Controls.AddRange(new Control[] { _chkConfirm, _chkConfirmFiles, _chkConfirmFolders });
+        }
+
+        private void UpdateConfirmAvailability()
+        {
+            _chkConfirmFiles.Enabled = !_confirmFilesManaged && _chkConfirm.Checked;
+            _chkConfirmFolders.Enabled = !_confirmFoldersManaged && _chkConfirm.Checked;
         }
 
         private Control BuildSortingGroup()
@@ -336,7 +373,7 @@ namespace trutility
             // In MenuSort order, so a button's position is the value it stands for.
             _sortOptions = new[]
             {
-                new RadioButton { Text = "Sort by name", AutoSize = true },
+                new RadioButton { Text = "Sort by name (A to Z)", AutoSize = true },
                 new RadioButton { Text = "Sort by date (newest first)", AutoSize = true },
                 new RadioButton { Text = "Sort by file extension", AutoSize = true },
             };
@@ -634,6 +671,21 @@ namespace trutility
             if (!_focusSearchManaged)
             {
                 ToggleSetting.FocusSearch.SaveIfChanged(_chkFocusSearch.Checked);
+            }
+
+            // Read at the moment of deleting, so no rebuild. The two under the
+            // main checkbox are saved while greyed out too, like the focus choice.
+            if (_chkConfirm.Enabled)
+            {
+                ToggleSetting.ConfirmDelete.SaveIfChanged(_chkConfirm.Checked);
+            }
+            if (!_confirmFilesManaged)
+            {
+                ToggleSetting.ConfirmDeleteFiles.SaveIfChanged(_chkConfirmFiles.Checked);
+            }
+            if (!_confirmFoldersManaged)
+            {
+                ToggleSetting.ConfirmDeleteFolders.SaveIfChanged(_chkConfirmFolders.Checked);
             }
 
             // The same goes for the delay, which is also read as the menu opens.

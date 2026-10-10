@@ -10,6 +10,9 @@ namespace trutility
         public string Name { get; }
         public string FilePath { get; set; }
         public string FolderPath { get; set; }
+
+        /// The shortcut this folder was expanded from; null for a real folder.
+        public string LinkPath { get; set; }
         public bool SeparatorBefore { get; set; }
         public bool SeparatorAfter { get; set; }
         public bool IsSeparator { get; }
@@ -488,6 +491,7 @@ namespace trutility
             MenuNode node = new MenuNode(parsed.DisplayName, parsed.SepBefore, parsed.SepAfter)
             {
                 FolderPath = target,
+                LinkPath = linkPath,
                 IsFlattened = parsed.Flatten,
             };
             ScanIntoTree(node, target, context);

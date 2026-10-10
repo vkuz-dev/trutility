@@ -529,10 +529,22 @@ namespace trutility
             subMenu.DropDownOpening += (s, e) => FillIcons(subMenu.DropDownItems);
 
             string folderPath = child.FolderPath;
+            string linkPath = child.LinkPath;
             if (folderPath != null)
             {
                 subMenu.MouseDown += (s, e) =>
                 {
+                    if (e.Button == MouseButtons.Left && (Control.ModifierKeys & Keys.Control) != 0)
+                    {
+                        _menu?.Close();
+
+                        // An expanded shortcut loses only the shortcut; the
+                        // folder it points at is never touched.
+                        if (linkPath != null) TryDeleteUserFile(linkPath);
+                        else TryDeleteUserFolder(folderPath);
+                        return;
+                    }
+
                     if (e.Button != MouseButtons.Middle) return;
 
                     OpenFolder(folderPath);
@@ -609,8 +621,10 @@ namespace trutility
 
                 if ((Control.ModifierKeys & Keys.Control) != 0)
                 {
+                    // Closed first: the deleted entry is not left on screen,
+                    // and the confirmation is not shown over an open menu.
+                    _menu?.Close();
                     TryDeleteUserFile(filePath);
-                    _menu?.Close();   // so the deleted entry is not left on screen
                     return;
                 }
 
@@ -701,9 +715,51 @@ namespace trutility
                 ShowBalloon("trutility", "Only files in your User folder can be deleted from the menu.");
                 return;
             }
+
+            if (!ConfirmDelete(ToggleSetting.ConfirmDeleteFiles, "Delete this file?", path))
+                return;
+
             try
             {
                 Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
+                    path,
+                    Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
+                    Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                // Watcher will trigger a rebuild automatically
+            }
+            catch (Exception ex)
+            {
+                ShowBalloon("trutility – delete failed", ex.Message);
+            }
+        }
+
+        /// True when the delete may go ahead: either nothing asks for this kind
+        /// of entry, or the user said yes.
+        private static bool ConfirmDelete(ToggleSetting kind, string question, string path)
+        {
+            if (!ToggleSetting.ConfirmDelete.IsOn() || !kind.IsOn()) return true;
+
+            return MessageBox.Show(
+                $"{question}\n\n{path}\n\nIt will be sent to the Recycle Bin.",
+                "trutility", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
+                MessageBoxDefaultButton.Button2) == DialogResult.Yes;
+        }
+
+        private void TryDeleteUserFolder(string path)
+        {
+            // Same boundary as TryDeleteUserFile, and the user root itself stays.
+            if (!RootsLib.IsUnder(path, UserRoot) || RootsLib.IsUnder(UserRoot, path))
+            {
+                ShowBalloon("trutility", "Only folders inside your User folder can be deleted from the menu.");
+                return;
+            }
+
+            if (!ConfirmDelete(ToggleSetting.ConfirmDeleteFolders, "Delete this folder and everything in it?", path))
+                return;
+
+            try
+            {
+                Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(
                     path,
                     Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
                     Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
