@@ -52,29 +52,58 @@ namespace trutility
             Controls.Add(BuildLayout());
         }
 
+        private TableLayoutPanel BuildLayout()
+        {
+            TableLayoutPanel layout = NewColumn(BuildTabs(), BuildButtonRow());
+            layout.Padding = new Padding(12);
+            return layout;
+        }
+
+        private TabControl BuildTabs()
+        {
+            TabControl tabs = new TabControl();
+            Size largest = Size.Empty;
+
+            void AddPage(string title, params Control[] rows)
+            {
+
+                TableLayoutPanel column = NewColumn(rows);
+                column.Padding = new Padding(10);
+                column.Dock = DockStyle.Top;
+
+                Size wanted = column.GetPreferredSize(Size.Empty);
+                largest = new Size(
+                    Math.Max(largest.Width, wanted.Width),
+                    Math.Max(largest.Height, wanted.Height));
+
+                TabPage page = new TabPage(title) { UseVisualStyleBackColor = true };
+                page.Controls.Add(column);
+                tabs.TabPages.Add(page);
+            }
+
+            AddPage("General", BuildUserGroup(), BuildSettingsGroup());
+            AddPage("Advanced", BuildAdvancedSettings());
+            AddPage("About", BuildHeader(), BuildHelpGroup());
+
+            // What the tab strip and the border take up around a page.
+            Size chrome = tabs.Size - tabs.DisplayRectangle.Size;
+            tabs.Size = largest + chrome;
+            return tabs;
+        }
+
         /// <summary>
         /// One column of sections, each as tall as its contents. The column is
         /// as wide as the widest section, and every section stretches to it so
         /// their edges line up.
         /// </summary>
-        private TableLayoutPanel BuildLayout()
+        private static TableLayoutPanel NewColumn(params Control[] rows)
         {
-            Control[] rows =
-            {
-                BuildHeader(),
-                BuildUserGroup(),
-                BuildSettingsGroup(),
-                BuildHelpGroup(),
-                BuildButtonRow(),
-            };
-
             TableLayoutPanel layout = new TableLayoutPanel
             {
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 ColumnCount = 1,
                 RowCount = rows.Length,
-                Padding = new Padding(12),
             };
             layout.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
@@ -117,8 +146,8 @@ namespace trutility
                     "Your files, folders and programs, one click away.\n\n" +
                     "trutility is a menu that lives next to the clock. Click its icon and pick what you want to open,\n" +
                     "with no digging through folders or the Start menu.\n\n" +
-                    "To add something, create a shortcut(or a file) - in Your folder below. Turn on \"Add to trutility\"\n" +
-                    "in Settings to add things with a right-click in Explorer.\n\n" +
+                    "To add something, create a shortcut(or a file) - in Your folder on the General tab. Turn on\n" +
+                    "\"Add to trutility\" there to add things with a right-click in Explorer.\n\n" +
                     "Author: Vladimir Kuznetsov",
                 AutoSize = true,
                 Margin = Padding.Empty,
@@ -233,10 +262,6 @@ namespace trutility
             _chkTrayPin = NewSetting(
                 "Pin icon to tray", SettingsTrayPin.IsPinEnabled(), trayPinManaged);
 
-            _chkExtensions = NewSetting(
-                "Show file extensions",
-                ToggleSetting.ShowExtensions.IsOn(), ToggleSetting.ShowExtensions.IsManagedByPolicy());
-
             _chkEnableSearch = NewSetting(
                 "Enable search box",
                 ToggleSetting.EnableSearch.IsOn(), ToggleSetting.EnableSearch.IsManagedByPolicy());
@@ -260,9 +285,17 @@ namespace trutility
             };
             stack.Controls.AddRange(new Control[]
             {
-                _chkShell, _chkStartup, _chkTrayPin, _chkExtensions, _chkEnableSearch, _chkFocusSearch,
+                _chkShell, _chkStartup, _chkTrayPin, _chkEnableSearch, _chkFocusSearch,
             });
             return NewGroup("Settings", stack);
+        }
+
+        private Control BuildAdvancedSettings()
+        {
+            _chkExtensions = NewSetting(
+                "Show file extensions",
+                ToggleSetting.ShowExtensions.IsOn(), ToggleSetting.ShowExtensions.IsManagedByPolicy());
+            return _chkExtensions;
         }
 
         private void UpdateFocusSearchAvailability()
