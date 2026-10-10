@@ -89,14 +89,17 @@ A `$F` shortcut shows nothing at all — rather than a dead entry — when its t
 | Middle Click | open the folder location in Explorer |
 
 Ctrl+Click only works on files in your own folder. Shared folders are read-only.
+On an expanded folder shortcut it removes the shortcut only, never the folder it points at.
+On a real folder it removes the folder and everything in it.
+It asks for confirmation first; the Advanced tab of Settings turns that off for files, folders or both.
 
 ## Searching
 
-The box at the top of the menu searches every folder at once, however deep. Click it and type at least two characters; results appear once you stop typing for a second (the delay can be changed in [Settings](#settings)).
+The box at the top of the menu searches every folder at once, however deep. Type at least two characters; results appear once you stop typing for a second (the delay can be changed in [Settings](#settings)).
 
 Search is on by default. Untick **Enable search box** in Settings to remove the box and get the plain menu back.
 
-To type straight away without clicking, turn on **Focus search box by default** in Settings. It's off by default because it hands the keyboard to the box: arrow keys, Enter and letter keys stop moving around the menu and go into the search instead.
+The box has the keyboard as soon as the menu opens, so you can type straight away. Letter keys then go into the search instead of jumping to an entry; to get that back, untick **Focus search box by default** in Settings and click the box when you want to search.
 
 ```
 [ fin pay        ]
@@ -112,9 +115,10 @@ payroll.xlsx       Finance ▸ Reports
 
 | Key | Effect |
 |---|---|
-| **Enter** | launch the top result — straight away, without waiting for the pause |
+| **Up** / **Down** | move the highlight through the entries — results, or the whole top level while the box is empty — wrapping at the ends |
+| **Enter** | launch the highlighted entry, or the top result when nothing is highlighted — straight away, without waiting for the pause |
 | **Shift** + **Enter** | launch it as Administrator |
-| **Down** | move into the results |
+| **Right** or **Enter** on a folder | open its submenu |
 | **Esc** | clear the box; press it again to close the menu |
 
 A result behaves like any other entry, so Shift+Click and Ctrl+Click work on it too.
@@ -129,7 +133,7 @@ Click the tray icon → **Settings**. The dialog has three tabs.
 - **Run at startup**
 - **Pin icon to tray**
 - **Enable search box** — on by default; turned off, the menu has no search box at all
-- **Focus search box by default** — off by default, and greyed out while search is off; see [Searching](#searching)
+- **Focus search box by default** — on by default, and greyed out while search is off; see [Searching](#searching)
 - **Search delay** — 1000 milliseconds by default, and greyed out while search is off; how long to wait after the last keystroke before searching. Setting it to 0 or leaving it empty puts 1000 back.
 - **Your folder** — change its location, reset it, or open it
 
@@ -138,6 +142,9 @@ Click the tray icon → **Settings**. The dialog has three tabs.
 - **Show file extensions** — on by default
 - **Expand folder shortcuts by default** — on by default; a shortcut to a folder opens as a submenu without needing `$F` in its name. Turned off, only shortcuts marked `$F` or `$X` expand.
 - **Folder item limit** — 250 by default; the largest folder, counted in files and folders with subfolders included, that is expanded this way. A bigger one stays a plain shortcut unless its name ends in `$F`. Setting it to 0 or leaving it empty puts 250 back.
+- **Ask for confirmation when** — on by default; turned off, Ctrl+Click never asks before deleting.
+  - **Deleting files** — on by default; covers files, shortcuts and expanded folder shortcuts.
+  - **Deleting folders** — on by default; covers real folders, which go with everything in them.
 - **Sorting** — the order of files within each folder: by name (the default), by date modified with the newest first, or by extension. For a shortcut both the date and the extension are the shortcut's own, not its target's. Submenus always stay in name order.
   - **Reverse order** — turns the chosen order around: Z to A, oldest first. Submenus are reversed too.
   - **Folders before files** — lists submenus above the files of each folder instead of below them.
@@ -238,6 +245,9 @@ Under `HKLM\SOFTWARE\trutility`:
 | `ReverseSort` | `REG_DWORD` | Chosen order reversed, or not. |
 | `FoldersFirst` | `REG_DWORD` | Submenus listed above files, or below. |
 | `SearchDelayMs` | `REG_DWORD` | Pause after typing before a search runs, in milliseconds. 0 means the default of 1000. |
+| `ConfirmDelete` | `REG_DWORD` | Ctrl+Click asks before deleting, or never does. |
+| `ConfirmDeleteFiles` | `REG_DWORD` | Deleting a file or shortcut asks first, or not. |
+| `ConfirmDeleteFolders` | `REG_DWORD` | Deleting a real folder asks first, or not. |
 
 These apply to anyone who has not already changed the setting themselves — the dialog then shows it greyed out as managed. **A user who changed it before the policy arrived keeps their own choice**, because the matching `HKCU` value shadows `HKLM`. To re-assert one, delete it from `HKCU\SOFTWARE\trutility` as well.
 
