@@ -43,13 +43,13 @@ notes.txt
 ───────────────
 Scripts          ▶  backup.ps1
 ───────────────
-About / Settings
+Settings
 Exit
 ```
 
 `.lnk` and `.url` always lose their extension in the menu, since the shortcut is not the point. Other files show theirs — `eventvwr.msc` stays `eventvwr.msc` — unless extensions are turned off in Settings. Folder names are never cut at a dot.
 
-Within each folder, files are listed before subfolders, parted by a thin line. `desktop.ini` and `thumbs.db` are ignored; everything else becomes an entry.
+Within each folder, files are listed before subfolders, parted by a thin line — the order can be changed in [Settings](#settings). `desktop.ini` and `thumbs.db` are ignored; everything else becomes an entry.
 
 ## Organising the menu
 
@@ -60,10 +60,12 @@ Append to a **file or folder name**. Suffixes are never displayed — `putty$^_.
 | `$^` | separator above |
 | `$_` | separator below |
 | `$^_` | separators on both sides |
-| `$F` | a shortcut to a folder opens as a submenu, like the folder itself — **adds** a menu level |
+| `$F` | a shortcut to a folder opens as a submenu, like the folder itself, whatever its size — **adds** a menu level |
 | `$X` | a folder, or a shortcut to one, is replaced by its contents — **removes** a menu level |
 
 `$F` only applies to `.lnk` and `.url` shortcuts. `$X` applies to folders and shortcuts alike.
+
+A shortcut to a folder opens as a submenu without any suffix too, as long as the folder holds no more than 250 items — files and folders, subfolders included. Above that it stays an ordinary shortcut that opens the folder in Explorer, so a link to a whole drive or a large share doesn't flood the menu. `$F` is how you ask for the submenu regardless of size. Both the behaviour and the limit can be changed in [Settings](#settings).
 
 `$X` is how you keep a folder on disk without it showing up in the menu:
 
@@ -75,7 +77,7 @@ Tools$X\                          server1
 
 Its children land exactly where the folder would have, keeping their own order. To collapse two levels, mark both — `Tools$X\Remote$X\`. On a `.lnk` or `.url` it implies `$F`, so `Finance$X.lnk` drops the target folder's contents straight into the menu without a `Finance` submenu around them.
 
-A `$F` shortcut shows nothing at all — rather than a dead entry — when its target is unreachable, denied, or already on the menu. It cannot reach into another watched folder, so it can never pull shared tools across the line into your own section.
+A `$F` shortcut shows nothing at all — rather than a dead entry — when its target is unreachable, denied, or already on the menu. It cannot reach into another watched folder, so it can never pull shared tools across the line into your own section. A shortcut without `$F` is never hidden this way: when it can't be opened as a submenu it simply stays a shortcut.
 
 ## Using the menu
 
@@ -90,7 +92,7 @@ Ctrl+Click only works on files in your own folder. Shared folders are read-only.
 
 ## Searching
 
-The box at the top of the menu searches every folder at once, however deep. Click it and type at least two characters; results appear once you stop typing for a second.
+The box at the top of the menu searches every folder at once, however deep. Click it and type at least two characters; results appear once you stop typing for a second (the delay can be changed in [Settings](#settings)).
 
 Search is on by default. Untick **Enable search box** in Settings to remove the box and get the plain menu back.
 
@@ -119,18 +121,35 @@ A result behaves like any other entry, so Shift+Click and Ctrl+Click work on it 
 
 ## Settings
 
-Right-click the tray icon → **About / Settings**:
+Click the tray icon → **Settings**. The dialog has three tabs.
+
+**General**
 
 - **Add to trutility in Explorer context menu** — right-click any file or folder to drop a shortcut into your folder
 - **Run at startup**
 - **Pin icon to tray**
-- **Show file extensions** — on by default
 - **Enable search box** — on by default; turned off, the menu has no search box at all
 - **Focus search box by default** — off by default, and greyed out while search is off; see [Searching](#searching)
+- **Search delay** — 1000 milliseconds by default, and greyed out while search is off; how long to wait after the last keystroke before searching. Setting it to 0 or leaving it empty puts 1000 back.
 - **Your folder** — change its location, reset it, or open it
-- **Refresh menu** — rescans every folder and reloads every icon. Changes are normally picked up on their own; this is for when they aren't, such as a share that just came back online or a program updated in place that still shows its old icon.
 
-Any setting an administrator has decided is shown as *[Managed by Administrator]* and greyed out.
+**Advanced**
+
+- **Show file extensions** — on by default
+- **Expand folder shortcuts by default** — on by default; a shortcut to a folder opens as a submenu without needing `$F` in its name. Turned off, only shortcuts marked `$F` or `$X` expand.
+- **Folder item limit** — 250 by default; the largest folder, counted in files and folders with subfolders included, that is expanded this way. A bigger one stays a plain shortcut unless its name ends in `$F`. Setting it to 0 or leaving it empty puts 250 back.
+- **Sorting** — the order of files within each folder: by name (the default), by date modified with the newest first, or by extension. For a shortcut both the date and the extension are the shortcut's own, not its target's. Submenus always stay in name order.
+  - **Reverse order** — turns the chosen order around: Z to A, oldest first. Submenus are reversed too.
+  - **Folders before files** — lists submenus above the files of each folder instead of below them.
+
+**About** — what trutility is, and the naming suffixes and click actions at a glance.
+
+Under the tabs:
+
+- **Refresh menu** — rescans every folder and reloads every icon. Changes are normally picked up on their own; this is for when they aren't, such as a share that just came back online or a program updated in place that still shows its old icon.
+- **Apply** — saves like OK but keeps the dialog open, so you can try a few combinations against the real menu. What has been applied stays applied; Cancel only drops changes made since.
+
+Any setting an administrator has decided is greyed out, and marked *[Managed by Administrator]* — except the two number boxes, which are only greyed out.
 
 ## Deploying to groups
 
@@ -213,6 +232,12 @@ Under `HKLM\SOFTWARE\trutility`:
 | `ShowExtensions` | `REG_DWORD` | File extensions shown in the menu or not. |
 | `EnableSearch` | `REG_DWORD` | Search box shown at the top of the menu, or not. |
 | `FocusSearch` | `REG_DWORD` | Search box takes the keyboard when the menu opens, or not. |
+| `ExpandFolderShortcuts` | `REG_DWORD` | Shortcuts to folders open as submenus without `$F`, or not. |
+| `AutoExpandLimit` | `REG_DWORD` | Largest folder, in items, expanded without `$F`. 0 means the default of 250. |
+| `SortBy` | `REG_DWORD` | Order of files within a folder: 0 by name, 1 by date (newest first), 2 by extension. |
+| `ReverseSort` | `REG_DWORD` | Chosen order reversed, or not. |
+| `FoldersFirst` | `REG_DWORD` | Submenus listed above files, or below. |
+| `SearchDelayMs` | `REG_DWORD` | Pause after typing before a search runs, in milliseconds. 0 means the default of 1000. |
 
 These apply to anyone who has not already changed the setting themselves — the dialog then shows it greyed out as managed. **A user who changed it before the policy arrived keeps their own choice**, because the matching `HKCU` value shadows `HKLM`. To re-assert one, delete it from `HKCU\SOFTWARE\trutility` as well.
 
