@@ -9,7 +9,7 @@ using trutility.Settings;
 
 namespace trutility
 {
-    internal sealed class AboutDialog : Form
+    internal sealed class SettingsDialog : Form
     {
         /// Set once OK saves a change that affects what the menu shows.
         public bool MenuNeedsRebuild { get; private set; }
@@ -30,13 +30,13 @@ namespace trutility
         private bool _focusSearchManaged;
         private readonly Action _refreshMenu;
 
-        public AboutDialog(Root userRoot, Action refreshMenu)
+        public SettingsDialog(Root userRoot, Action refreshMenu)
         {
             _userRoot = userRoot == null ? RootsLib.ResolveUserRootPath() : userRoot.Path;
             _refreshMenu = refreshMenu;
 
             Version ver = Assembly.GetExecutingAssembly().GetName().Version;
-            Text = $"About | trutility v{ver.Major}.{ver.Minor}.{ver.Build}";
+            Text = $"Settings | trutility v{ver.Major}.{ver.Minor}.{ver.Build}";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;

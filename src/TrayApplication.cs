@@ -631,9 +631,9 @@ namespace trutility
         {
             menu.Items.Add(new ToolStripSeparator());
 
-            ToolStripMenuItem about = new HoverMenuItem("About / Settings");
-            about.Click += OnAbout;
-            menu.Items.Add(about);
+            ToolStripMenuItem settings = new HoverMenuItem("Settings");
+            settings.Click += OnSettings;
+            menu.Items.Add(settings);
 
             ToolStripMenuItem exit = new HoverMenuItem("Exit");
             exit.Click += (s, e) => Application.Exit();
@@ -742,11 +742,11 @@ namespace trutility
             }
         }
 
-        // ── About / Settings dialog ───────────────────────────────────────────
+        // ── Settings dialog ───────────────────────────────────────────────────
 
-        private void OnAbout(object sender, EventArgs e)
+        private void OnSettings(object sender, EventArgs e)
         {
-            using (AboutDialog dlg = new AboutDialog(RootsLib.GetUserRoot(), RefreshMenu))
+            using (SettingsDialog dlg = new SettingsDialog(RootsLib.GetUserRoot(), RefreshMenu))
             {
                 dlg.ShowDialog();
                 // A new folder location or a display change both need a rebuild;

@@ -56,7 +56,7 @@ namespace trutility
         /// instead of a visible mistake.
         public bool IsBuiltIn { get; set; }
 
-        /// Human-readable origin, surfaced in the About dialog.
+        /// Human-readable origin, surfaced in the Settings dialog.
         public string Source { get; set; }
     }
 
@@ -365,7 +365,7 @@ namespace trutility
         /// <summary>
         /// Where the user root would land if the explicit HKCU choice were
         /// dropped: a location pinned by an administrator, or the built-in
-        /// default. Lets the About dialog preview a reset without performing one.
+        /// default. Lets the Settings dialog preview a reset without performing one.
         /// </summary>
         internal static string ResolveDefaultUserRootPath()
         {
