@@ -142,11 +142,10 @@ Click the tray icon → **Settings**. The dialog has three tabs.
 **Advanced**
 
 - **Show file extensions** — on by default
-- **Expand folder shortcuts by default** — on by default; a shortcut to a folder opens as a submenu without needing `$F` in its name. Turned off, only shortcuts marked `$F` or `$X` expand.
-- **Folder item limit** — 250 by default; the largest folder, counted in files and folders with subfolders included, that is expanded this way. A bigger one stays a plain shortcut unless its name ends in `$F`. Setting it to 0 or leaving it empty puts 250 back.
-- **Ask for confirmation when** — on by default; turned off, Ctrl+Click never asks before deleting.
-  - **Deleting files** — on by default; covers files, shortcuts and expanded folder shortcuts.
-  - **Deleting folders** — on by default; covers real folders, which go with everything in them.
+- **Automatically expand folder shortcuts** — on by default; a shortcut to a folder opens as a submenu without needing `$F` in its name. Turned off, only shortcuts marked `$F` or `$X` expand.
+- **Auto-expand folders up to this many items** — 250 by default; the largest folder, counted in files and folders with subfolders included, that is expanded this way. A bigger one stays a plain shortcut unless its name ends in `$F`. Setting it to 0 or leaving it empty puts 250 back.
+- **Ask for confirmation when deleting files** — on by default; covers files, shortcuts and expanded folder shortcuts.
+- **Ask for confirmation when deleting folders** — on by default; covers real folders, which go with everything in them.
 - **Sorting** — the order of files within each folder: by name (the default), by date modified with the newest first, or by extension. For a shortcut both the date and the extension are the shortcut's own, not its target's. Submenus always stay in name order.
   - **Reverse order** — turns the chosen order around: Z to A, oldest first. Submenus are reversed too.
   - **Folders before files** — lists submenus above the files of each folder instead of below them.
@@ -247,7 +246,6 @@ Under `HKLM\SOFTWARE\trutility`:
 | `ReverseSort` | `REG_DWORD` | Chosen order reversed, or not. |
 | `FoldersFirst` | `REG_DWORD` | Submenus listed above files, or below. |
 | `SearchDelayMs` | `REG_DWORD` | Pause after typing before a search runs, in milliseconds. 0 means the default of 1000. |
-| `ConfirmDelete` | `REG_DWORD` | Ctrl+Click asks before deleting, or never does. |
 | `ConfirmDeleteFiles` | `REG_DWORD` | Deleting a file or shortcut asks first, or not. |
 | `ConfirmDeleteFolders` | `REG_DWORD` | Deleting a real folder asks first, or not. |
 
