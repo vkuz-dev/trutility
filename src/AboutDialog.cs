@@ -297,7 +297,7 @@ namespace trutility
                     "    File actions:\n" +
                     "    Ctrl + Click  remove from your folder (Recycle Bin)\n" +
                     "    Shift + Click  run as Administrator\n" +
-                    "    Middle Click  open the folder containing the file in Explorer\n",
+                    "    Middle Click  open the folder location in Explorer\n",
             };
             return NewGroup("Menu organization", help);
         }

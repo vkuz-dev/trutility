@@ -524,6 +524,18 @@ namespace trutility
             ToolStripMenuItem subMenu = new HoverMenuItem(child.Name);
             PopulateMenu(subMenu.DropDownItems, child);
             subMenu.DropDownOpening += (s, e) => FillIcons(subMenu.DropDownItems);
+
+            string folderPath = child.FolderPath;
+            if (folderPath != null)
+            {
+                subMenu.MouseDown += (s, e) =>
+                {
+                    if (e.Button != MouseButtons.Middle) return;
+
+                    OpenFolder(folderPath);
+                    _menu?.Close();
+                };
+            }
             items.Add(subMenu);
         }
 
@@ -657,6 +669,19 @@ namespace trutility
             catch (Exception ex)
             {
                 MessageBox.Show($"Could not open the location of:\n{path}\n\n{ex.Message}",
+                    "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void OpenFolder(string path)
+        {
+            try
+            {
+                Process.Start("explorer.exe", $"\"{path}\"");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Could not open:\n{path}\n\n{ex.Message}",
                     "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }

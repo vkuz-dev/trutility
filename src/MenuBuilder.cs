@@ -9,6 +9,7 @@ namespace trutility
     {
         public string Name { get; }
         public string FilePath { get; set; }
+        public string FolderPath { get; set; }
         public bool SeparatorBefore { get; set; }
         public bool SeparatorAfter { get; set; }
         public bool IsSeparator { get; }
@@ -209,7 +210,10 @@ namespace trutility
             // boundaries of whichever root is being scanned right now.
             context.ForeignRoots = ForeignRootPaths(root, context.AllRoots);
 
-            MenuNode section = new MenuNode(SectionName(root), false, false);
+            MenuNode section = new MenuNode(SectionName(root), false, false)
+            {
+                FolderPath = root.Path,
+            };
             ScanIntoTree(section, root.Path, context);
             return section.Children.Count > 0 ? section : null;
         }
@@ -360,6 +364,7 @@ namespace trutility
                     MenuNode folderNode =
                         new MenuNode(parsed.DisplayName, parsed.SepBefore, parsed.SepAfter)
                         {
+                            FolderPath = subDir,
                             IsFlattened = parsed.Flatten,
                         };
 
@@ -410,6 +415,7 @@ namespace trutility
 
             MenuNode node = new MenuNode(parsed.DisplayName, parsed.SepBefore, parsed.SepAfter)
             {
+                FolderPath = target,
                 IsFlattened = parsed.Flatten,
             };
             ScanIntoTree(node, target, context);

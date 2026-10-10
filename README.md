@@ -84,6 +84,7 @@ A `$F` shortcut shows nothing at all — rather than a dead entry — when its t
 | Click | launch |
 | **Shift** + Click | run as Administrator |
 | **Ctrl** + Click | remove from your folder (sent to the Recycle Bin) |
+| Middle Click | open the folder location in Explorer |
 
 Ctrl+Click only works on files in your own folder. Shared folders are read-only.
 
