@@ -23,6 +23,7 @@ namespace trutility
         private Label _userRootLabel;
         private CheckBox _chkShell;
         private CheckBox _chkStartup;
+        private CheckBox _chkDesktop;
         private CheckBox _chkTrayPin;
         private CheckBox _chkExtensions;
         private CheckBox _chkExpand;
@@ -271,6 +272,9 @@ namespace trutility
             _chkStartup = NewSetting(
                 "Run at startup", ShortcutSetting.Startup.IsEnabled(), ShortcutSetting.Startup.IsGlobal());
 
+            _chkDesktop = NewSetting(
+                "Create Desktop shortcut", ShortcutSetting.Desktop.IsEnabled(), ShortcutSetting.Desktop.IsGlobal());
+
             bool trayPinManaged = SettingsTrayPin.IsManagedByPolicy();
             _chkTrayPin = NewSetting(
                 "Pin icon to tray", SettingsTrayPin.IsPinEnabled(), trayPinManaged);
@@ -300,7 +304,7 @@ namespace trutility
             };
             stack.Controls.AddRange(new Control[]
             {
-                _chkShell, _chkStartup, _chkTrayPin, _chkEnableSearch, _chkFocusSearch, delayRow,
+                _chkShell, _chkStartup, _chkDesktop, _chkTrayPin, _chkEnableSearch, _chkFocusSearch, delayRow,
             });
             return NewGroup("Settings", stack);
         }
@@ -604,6 +608,7 @@ namespace trutility
             }
 
             ShortcutSetting.Startup.Set(_chkStartup.Checked);
+            ShortcutSetting.Desktop.Set(_chkDesktop.Checked);
 
             if (_chkTrayPin.Enabled)
                 SettingsTrayPin.SaveTrayPin(_chkTrayPin.Checked);

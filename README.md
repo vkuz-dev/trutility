@@ -131,6 +131,7 @@ Click the tray icon → **Settings**. The dialog has three tabs.
 
 - **Add to trutility in Explorer context menu** — right-click any file or folder to drop a shortcut into your folder
 - **Run at startup**
+- **Create Desktop shortcut** — off by default; greyed out when an administrator has already put one on the desktop for all users
 - **Pin icon to tray**
 - **Enable search box** — on by default; turned off, the menu has no search box at all
 - **Focus search box by default** — on by default, and greyed out while search is off; see [Searching](#searching)
@@ -251,7 +252,7 @@ Under `HKLM\SOFTWARE\trutility`:
 
 These apply to anyone who has not already changed the setting themselves — the dialog then shows it greyed out as managed. **A user who changed it before the policy arrived keeps their own choice**, because the matching `HKCU` value shadows `HKLM`. To re-assert one, delete it from `HKCU\SOFTWARE\trutility` as well.
 
-Put a shortcut to `trutility.exe` in the **common** Startup folder to force auto-start for every user.
+Put a shortcut to `trutility.exe` in the **common** Startup folder to force auto-start for every user. A shortcut in the common Desktop folder (`C:\Users\Public\Desktop`) likewise gives every user the desktop icon. Either way the matching checkbox is greyed out as managed.
 
 ### Getting it right
 

@@ -16,6 +16,9 @@ namespace trutility.Settings
         public static readonly ShortcutSetting Startup = new ShortcutSetting(
             Environment.SpecialFolder.Startup, Environment.SpecialFolder.CommonStartup);
 
+        public static readonly ShortcutSetting Desktop = new ShortcutSetting(
+            Environment.SpecialFolder.DesktopDirectory, Environment.SpecialFolder.CommonDesktopDirectory);
+
         private readonly Environment.SpecialFolder _userFolder;
         private readonly Environment.SpecialFolder _globalFolder;
 
@@ -62,8 +65,11 @@ namespace trutility.Settings
 
             if (enable)
             {
-                RemoveShortcutsIn(UserFolder);   // clean up stale entries
-                string lnkPath = Path.Combine(UserFolder, AppBaseName + ".lnk");
+                // An existing shortcut is re-pointed where it is, which fixes
+                // a stale target without deleting it: a deleted and recreated
+                // desktop icon loses the place the user gave it.
+                string lnkPath = FindExistingShortcut(UserFolder)
+                    ?? Path.Combine(UserFolder, AppBaseName + ".lnk");
                 CreateShortcut(lnkPath, AppProcessPath);
             }
             else
