@@ -19,6 +19,11 @@ namespace trutility.Settings
         public static readonly ShortcutSetting Desktop = new ShortcutSetting(
             Environment.SpecialFolder.DesktopDirectory, Environment.SpecialFolder.CommonDesktopDirectory);
 
+        // shortcut: only the top of each Programs folder is looked at, so one an
+        // installer files under a subfolder is not detected; recurse if that comes up.
+        public static readonly ShortcutSetting StartMenu = new ShortcutSetting(
+            Environment.SpecialFolder.Programs, Environment.SpecialFolder.CommonPrograms);
+
         private readonly Environment.SpecialFolder _userFolder;
         private readonly Environment.SpecialFolder _globalFolder;
 
