@@ -32,11 +32,13 @@ namespace trutility
         private CheckBox _chkFocusSearch;
         private bool _focusSearchManaged;
         private readonly Action _refreshMenu;
+        private readonly Action _rebuildMenu;
 
-        public SettingsDialog(Root userRoot, Action refreshMenu)
+        public SettingsDialog(Root userRoot, Action refreshMenu, Action rebuildMenu)
         {
             _userRoot = userRoot == null ? RootsLib.ResolveUserRootPath() : userRoot.Path;
             _refreshMenu = refreshMenu;
+            _rebuildMenu = rebuildMenu;
 
             Version ver = Assembly.GetExecutingAssembly().GetName().Version;
             Text = $"Settings | trutility v{ver.Major}.{ver.Minor}.{ver.Build}";
@@ -393,7 +395,7 @@ namespace trutility
                     "Tools are grouped into Shared (at the top) and Personal (at the bottom).\n\n" +
                     "Append to a name:\n" +
                     "    $^  separator above      $_  separator below      $^_  both sides\n" +
-                    "    $F  a shortcut to a folder opens as a submenu, like the folder itself\n" +
+                    "    $F  a shortcut to a folder opens as a submenu even above the item limit (Advanced tab)\n" +
                     "    $X  a folder (or shortcut to one) is replaced by its contents, aka - unpack here\n\n" +
                     "    Example: reports$F$^.lnk  →  a folder named \"reports\" shown as an expandable submenu\n" + 
                     "    with a separator above.\n\n" +
@@ -412,7 +414,7 @@ namespace trutility
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 Anchor = AnchorStyles.Right,
-                FlowDirection = FlowDirection.RightToLeft,
+                FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = false,
                 Margin = Padding.Empty,
             };
@@ -428,7 +430,12 @@ namespace trutility
                 DialogResult = DialogResult.Cancel,
             };
 
-            dialogButtons.Controls.AddRange(new Control[] { ok, cancel });
+            // Saves like OK but leaves the dialog open, to try one combination
+            // of settings after another against the real menu.
+            Button apply = new Button { Text = "Apply", AutoSize = true, MinimumSize = new Size(80, 26) };
+            apply.Click += OnApplyClick;
+
+            dialogButtons.Controls.AddRange(new Control[] { ok, cancel, apply });
             AcceptButton = ok;
             CancelButton = cancel;
 
@@ -479,6 +486,25 @@ namespace trutility
 
 
         private void OnOkClick(object sender, EventArgs e)
+        {
+            ApplySettings();
+            DialogResult = DialogResult.OK;
+            Close();
+        }
+
+        /// The dialog stays open, so the rebuild that OK leaves to whoever
+        /// opened it has to be asked for here.
+        private void OnApplyClick(object sender, EventArgs e)
+        {
+            ApplySettings();
+            if (MenuNeedsRebuild)
+            {
+                _rebuildMenu?.Invoke();
+                MenuNeedsRebuild = false;
+            }
+        }
+
+        private void ApplySettings()
         {
             if (_chkShell.Enabled)
             {
@@ -538,10 +564,10 @@ namespace trutility
                 {
                     RootsLib.ClearUserRoot();
                 }
-            }
 
-            DialogResult = DialogResult.OK;
-            Close();
+                // Applied once: a later Apply or OK has nothing new to save.
+                _userRootChanged = false;
+            }
         }
 
         private void OnChangeUserRoot(object sender, EventArgs e)

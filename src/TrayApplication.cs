@@ -747,7 +747,7 @@ namespace trutility
 
         private void OnSettings(object sender, EventArgs e)
         {
-            using (SettingsDialog dlg = new SettingsDialog(RootsLib.GetUserRoot(), RefreshMenu))
+            using (SettingsDialog dlg = new SettingsDialog(RootsLib.GetUserRoot(), RefreshMenu, BuildMenuAsync))
             {
                 dlg.ShowDialog();
                 // A new folder location or a display change both need a rebuild;
