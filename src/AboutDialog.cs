@@ -35,7 +35,8 @@ namespace trutility
             _userRoot = userRoot == null ? RootsLib.ResolveUserRootPath() : userRoot.Path;
             _refreshMenu = refreshMenu;
 
-            Text = "About trutility";
+            Version ver = Assembly.GetExecutingAssembly().GetName().Version;
+            Text = $"About | trutility v{ver.Major}.{ver.Minor}.{ver.Build}";
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
@@ -106,18 +107,52 @@ namespace trutility
 
         // ── Sections ──────────────────────────────────────────────────────────
 
+        private const string GitHubUrl = "https://github.com/vkuz-dev/trutility";
+
         private static Control BuildHeader()
         {
-            Version ver = Assembly.GetExecutingAssembly().GetName().Version;
-            return new Label
+            Label about = new Label
             {
                 Text =
-                    $"trutility - Tray Utility v{ver.Major}.{ver.Minor}.{ver.Build}\n" +
-                    "Keep your favourite files, tools or folders within reach.\n\n" +
-                    "Author: Vladimirs Kuznecovs   ·   " +
-                    "GitHub: https://github.com/vkuz-dev/trutility",
+                    "Your files, folders and programs, one click away.\n\n" +
+                    "trutility is a menu that lives next to the clock. Click its icon and pick what you want to open,\n" +
+                    "with no digging through folders or the Start menu.\n\n" +
+                    "To add something, create a shortcut(or a file) - in Your folder below. Turn on \"Add to trutility\"\n" +
+                    "in Settings to add things with a right-click in Explorer.\n\n" +
+                    "Author: Vladimir Kuznetsov",
                 AutoSize = true,
+                Margin = Padding.Empty,
             };
+
+            LinkLabel link = new LinkLabel
+            {
+                Text = GitHubUrl,
+                AutoSize = true,
+                Margin = Padding.Empty,
+            };
+            link.LinkClicked += (s, e) => OpenLink(GitHubUrl);
+
+            FlowLayoutPanel header = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+            };
+            header.Controls.AddRange(new Control[] { about, link });
+            return header;
+        }
+
+        private static void OpenLink(string url)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                Diag.Swallowed("opening " + url, ex);
+            }
         }
 
         private Control BuildUserGroup()
@@ -257,7 +292,8 @@ namespace trutility
                     "    $^  separator above      $_  separator below      $^_  both sides\n" +
                     "    $F  a shortcut to a folder opens as a submenu, like the folder itself\n" +
                     "    $X  a folder (or shortcut to one) is replaced by its contents, aka - unpack here\n\n" +
-                    "    Example: reports$F$^.lnk  →  a folder named \"reports\" shown as a submenu with a separator above.\n\n" +
+                    "    Example: reports$F$^.lnk  →  a folder named \"reports\" shown as an expandable submenu\n" + 
+                    "    with a separator above.\n\n" +
                     "    File actions:\n" +
                     "    Ctrl + Click  remove from your folder (Recycle Bin)\n" +
                     "    Shift + Click  run as Administrator\n" +
