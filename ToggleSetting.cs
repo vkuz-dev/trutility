@@ -28,7 +28,7 @@ namespace trutility.Settings
         /// of that goes to the box instead, which suits someone who always
         /// searches and surprises someone who navigates.
         /// </summary>
-        public static readonly ToggleSetting FocusSearch = new ToggleSetting("FocusSearch", false);
+        public static readonly ToggleSetting FocusSearch = new ToggleSetting("FocusSearch", true);
 
         /// <summary>
         /// Whether a shortcut to a folder opens as a submenu without $F in its
