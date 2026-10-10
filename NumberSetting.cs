@@ -11,6 +11,11 @@ namespace trutility.Settings
         /// The order of files within a folder, as a MenuSort value. Name by default.
         public static readonly NumberSetting SortBy = new NumberSetting("SortBy", 0);
 
+        /// How long the keyboard has to be quiet before a search runs, in
+        /// milliseconds, so a word typed quickly costs one search rather than
+        /// one per letter.
+        public static readonly NumberSetting SearchDelayMs = new NumberSetting("SearchDelayMs", 1000);
+
         private const string RegKeyPath = @"SOFTWARE\trutility";
 
         private readonly string _valueName;

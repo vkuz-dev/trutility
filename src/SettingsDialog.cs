@@ -31,6 +31,8 @@ namespace trutility
         private RadioButton[] _sortOptions;
         private CheckBox _chkEnableSearch;
         private CheckBox _chkFocusSearch;
+        private NumericUpDown _numSearchDelay;
+        private bool _searchDelayManaged;
         private bool _focusSearchManaged;
         private readonly Action _refreshMenu;
         private readonly Action _rebuildMenu;
@@ -277,10 +279,12 @@ namespace trutility
                 "Focus search box by default",
                 ToggleSetting.FocusSearch.IsOn(), _focusSearchManaged);
 
-            // With no search box there is nothing to focus, so the option is
-            // greyed out for as long as search is unticked.
-            _chkEnableSearch.CheckedChanged += (s, e) => UpdateFocusSearchAvailability();
-            UpdateFocusSearchAvailability();
+            _searchDelayManaged = NumberSetting.SearchDelayMs.IsManagedByPolicy();
+            _numSearchDelay = NewNumberBox(NumberSetting.SearchDelayMs, 10000);
+            Control delayRow = NewNumberRow(_numSearchDelay, "Search delay after typing, in milliseconds");
+
+            _chkEnableSearch.CheckedChanged += (s, e) => UpdateSearchAvailability();
+            UpdateSearchAvailability();
 
             FlowLayoutPanel stack = new FlowLayoutPanel
             {
@@ -291,7 +295,7 @@ namespace trutility
             };
             stack.Controls.AddRange(new Control[]
             {
-                _chkShell, _chkStartup, _chkTrayPin, _chkEnableSearch, _chkFocusSearch,
+                _chkShell, _chkStartup, _chkTrayPin, _chkEnableSearch, _chkFocusSearch, delayRow,
             });
             return NewGroup("Settings", stack);
         }
@@ -307,42 +311,8 @@ namespace trutility
                 ToggleSetting.ExpandFolderShortcuts.IsOn(), ToggleSetting.ExpandFolderShortcuts.IsManagedByPolicy());
 
             _expandLimitManaged = NumberSetting.AutoExpandLimit.IsManagedByPolicy();
-            _numExpandLimit = new NumericUpDown
-            {
-                Minimum = 0,
-                Maximum = 100000,
-                Width = 50,
-                Anchor = AnchorStyles.Left,
-            };
-            _numExpandLimit.Value = Math.Min(_numExpandLimit.Maximum, NumberSetting.AutoExpandLimit.Value());
-
-            // Shown as soon as the box is left, so what OK will save is never
-            // a surprise.
-            _numExpandLimit.Leave += (s, e) =>
-            {
-                int limit = ExpandLimit();
-                _numExpandLimit.Value = limit;
-                _numExpandLimit.Text = limit.ToString();
-            };
-
-            // Anchored to neither top nor bottom, which is what centres it on
-            // the box beside it.
-            Label limitLabel = new Label
-            {
-                Text = "Folder item limit (append $F to ignore)",
-                AutoSize = true,
-                Anchor = AnchorStyles.Left,
-            };
-
-            FlowLayoutPanel limitRow = new FlowLayoutPanel
-            {
-                AutoSize = true,
-                AutoSizeMode = AutoSizeMode.GrowAndShrink,
-                FlowDirection = FlowDirection.LeftToRight,
-                WrapContents = false,
-                Margin = Padding.Empty,
-            };
-            limitRow.Controls.AddRange(new Control[] { _numExpandLimit, limitLabel });
+            _numExpandLimit = NewNumberBox(NumberSetting.AutoExpandLimit, 100000);
+            Control limitRow = NewNumberRow(_numExpandLimit, "Folder item limit (append $F to ignore)");
 
             // The limit only means something while shortcuts expand on their own.
             _chkExpand.CheckedChanged += (s, e) => UpdateExpandLimitAvailability();
@@ -387,11 +357,58 @@ namespace trutility
                 stack.Enabled ? "Sorting" : "Sorting   [Managed by Administrator]", stack);
         }
 
-        /// Treat zero or empty as "not set" and fall back to the default
-        private int ExpandLimit()
+        /// A box for a numeric setting, starting at its current value.
+        private static NumericUpDown NewNumberBox(NumberSetting setting, int maximum)
         {
-            bool unset = _numExpandLimit.Text.Trim().Length == 0 || _numExpandLimit.Value == 0;
-            return unset ? NumberSetting.AutoExpandLimit.Default : (int)_numExpandLimit.Value;
+            NumericUpDown box = new NumericUpDown
+            {
+                Minimum = 0,
+                Maximum = maximum,
+                Width = 50,
+                Anchor = AnchorStyles.Left,
+            };
+            box.Value = Math.Min(box.Maximum, setting.Value());
+
+            // Shown as soon as the box is left, so what OK will save is never
+            // a surprise.
+            box.Leave += (s, e) =>
+            {
+                int number = NumberOrDefault(box, setting);
+                box.Value = number;
+                box.Text = number.ToString();
+            };
+            return box;
+        }
+
+        /// A number box with its caption to the right of it.
+        private static Control NewNumberRow(NumericUpDown box, string caption)
+        {
+            // Anchored to neither top nor bottom, which is what centres it on
+            // the box beside it.
+            Label label = new Label
+            {
+                Text = caption,
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+            };
+
+            FlowLayoutPanel row = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Margin = Padding.Empty,
+            };
+            row.Controls.AddRange(new Control[] { box, label });
+            return row;
+        }
+
+        /// Treat zero or empty as "not set" and fall back to the default
+        private static int NumberOrDefault(NumericUpDown box, NumberSetting setting)
+        {
+            bool unset = box.Text.Trim().Length == 0 || box.Value == 0;
+            return unset ? setting.Default : (int)box.Value;
         }
 
         private void UpdateExpandLimitAvailability()
@@ -399,9 +416,12 @@ namespace trutility
             _numExpandLimit.Enabled = !_expandLimitManaged && _chkExpand.Checked;
         }
 
-        private void UpdateFocusSearchAvailability()
+        /// With no search box there is nothing to focus and nothing to delay,
+        /// so both options are greyed out for as long as search is unticked.
+        private void UpdateSearchAvailability()
         {
             _chkFocusSearch.Enabled = !_focusSearchManaged && _chkEnableSearch.Checked;
+            _numSearchDelay.Enabled = !_searchDelayManaged && _chkEnableSearch.Checked;
         }
 
         private static CheckBox NewSetting(string text, bool value, bool managed)
@@ -566,7 +586,7 @@ namespace trutility
             // The limit is saved while greyed out too, for the same reason as
             // the focus choice below: it should still be there when expanding
             // is turned back on.
-            if (!_expandLimitManaged && NumberSetting.AutoExpandLimit.SaveIfChanged(ExpandLimit()))
+            if (!_expandLimitManaged && NumberSetting.AutoExpandLimit.SaveIfChanged(NumberOrDefault(_numExpandLimit, NumberSetting.AutoExpandLimit)))
             {
                 MenuNeedsRebuild = true;
             }
@@ -583,6 +603,12 @@ namespace trutility
             if (!_focusSearchManaged)
             {
                 ToggleSetting.FocusSearch.SaveIfChanged(_chkFocusSearch.Checked);
+            }
+
+            // The same goes for the delay, which is also read as the menu opens.
+            if (!_searchDelayManaged)
+            {
+                NumberSetting.SearchDelayMs.SaveIfChanged(NumberOrDefault(_numSearchDelay, NumberSetting.SearchDelayMs));
             }
 
             // Reset means "drop my choice and fall back", not "pin the path the

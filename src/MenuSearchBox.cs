@@ -26,11 +26,6 @@ namespace trutility
         /// ".txt" - so the tree stays until there is enough to narrow it down.
         private const int MinQueryLength = 2;
 
-        /// Typing only schedules a search; it runs once the keyboard has been
-        /// quiet this long, so a word typed quickly costs one search, not one
-        /// per letter.
-        private const int DebounceMs = 1000;
-
         /// <summary>
         /// The box's width when nothing else asks for more. A menu is as wide
         /// as its widest entry, so a box with a generous fixed width made every
@@ -76,7 +71,9 @@ namespace trutility
             _fillIcons = fillIcons;
             _launch = launch;
 
-            _debounce = new System.Windows.Forms.Timer { Interval = DebounceMs };
+            // Typing only schedules a search; it runs once the keyboard has been
+            // quiet for the interval, which is set each time the menu opens.
+            _debounce = new System.Windows.Forms.Timer();
             _debounce.Tick += (s, e) => FlushPending();
 
             _box = new ToolStripTextBox { AutoSize = false, Width = MinBoxWidth };
@@ -106,6 +103,9 @@ namespace trutility
             menu.Opened += (s, e) =>
             {
                 _anchor = MenuAnchor.Detect(_menu.Bounds, Cursor.Position);
+
+                // Read on every open, like the focus setting below.
+                _debounce.Interval = Settings.NumberSetting.SearchDelayMs.Value();
 
                 // Off by default, so the menu keeps working like any other with
                 // the keyboard; clicking the box is enough to start searching.
