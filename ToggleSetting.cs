@@ -45,6 +45,21 @@ namespace trutility.Settings
         /// below them. Off by default.
         public static readonly ToggleSetting FoldersFirst = new ToggleSetting("FoldersFirst", false);
 
+        /// Whether the extension filter applies to the menu tree. On by default.
+        public static readonly ToggleSetting FilterMenu = new ToggleSetting("FilterMenu", true);
+
+        /// Whether the extension filter applies to search results. On by default.
+        public static readonly ToggleSetting FilterSearch = new ToggleSetting("FilterSearch", true);
+
+        /// Whether each FilterCategory is hidden. All off by default.
+        public static readonly ToggleSetting HideImages = new ToggleSetting("HideImages", false);
+        public static readonly ToggleSetting HideWebPages = new ToggleSetting("HideWebPages", false);
+        public static readonly ToggleSetting HideConfigFiles = new ToggleSetting("HideConfigFiles", false);
+        public static readonly ToggleSetting HideProgramFiles = new ToggleSetting("HideProgramFiles", false);
+        public static readonly ToggleSetting HideLogsAndMisc = new ToggleSetting("HideLogsAndMisc", false);
+        public static readonly ToggleSetting HideMedia = new ToggleSetting("HideMedia", false);
+        public static readonly ToggleSetting HideFonts = new ToggleSetting("HideFonts", false);
+
         /// Whether deleting a file or a shortcut asks first. On by default.
         public static readonly ToggleSetting ConfirmDeleteFiles = new ToggleSetting("ConfirmDeleteFiles", true);
 

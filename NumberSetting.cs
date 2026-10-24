@@ -16,6 +16,10 @@ namespace trutility.Settings
         /// one per letter.
         public static readonly NumberSetting SearchDelayMs = new NumberSetting("SearchDelayMs", 1000);
 
+        /// What the extension filter does with the types it lists: 0 hides
+        /// them (the default), 1 shows only them.
+        public static readonly NumberSetting ExtensionFilterMode = new NumberSetting("ExtensionFilterMode", 0);
+
         private const string RegKeyPath = @"SOFTWARE\trutility";
 
         private readonly string _valueName;

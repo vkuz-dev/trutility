@@ -99,6 +99,16 @@ namespace trutility
             };
 
         /// <summary>
+        /// The file types the extension filter never removes: what this tool
+        /// exists to launch.
+        /// </summary>
+        private static readonly HashSet<string> UnfilteredExtensions =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                ".lnk", ".exe", ".msc", ".cpl", ".rdp"
+            };
+
+        /// <summary>
         /// State threaded through one build. ForeignRoots is set per root as each
         /// one is scanned, so a $F shortcut cannot reach across a root boundary.
         /// </summary>
@@ -117,6 +127,26 @@ namespace trutility
             public MenuSort Sort;
             public bool ReverseSort;
             public bool FoldersFirst;
+
+            /// The extensions the filter lists, or null for no filter.
+            public HashSet<string> FilterExtensions;
+
+            /// True: only the listed types are shown. False: they are hidden.
+            public bool FilterShowsOnlyListed;
+        }
+
+        /// <summary>
+        /// Reads an extension list as typed: separated by semicolons, commas or
+        /// spaces, with or without the dot, and "*.png" taken as ".png".
+        /// </summary>
+        public static HashSet<string> ParseExtensions(string list)
+        {
+            return new HashSet<string>(
+                (list ?? "").Split(new[] { ';', ',', ' ' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(e => e.Trim().TrimStart('*', '.'))
+                    .Where(e => e.Length > 0)
+                    .Select(e => "." + e),
+                StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -137,7 +167,9 @@ namespace trutility
                                          out List<string> accessErrors, out List<string> followedFolders,
                                          bool showExtensions = true, int autoExpandLimit = 0,
                                          MenuSort sort = MenuSort.Name, bool reverseSort = false,
-                                         bool foldersFirst = false)
+                                         bool foldersFirst = false,
+                                         HashSet<string> filterExtensions = null,
+                                         bool filterShowsOnlyListed = false)
         {
             List<Root> allRoots = new List<Root>(globalRoots ?? new Root[0]);
             if (userRoot != null)
@@ -156,6 +188,8 @@ namespace trutility
                 Sort = sort,
                 ReverseSort = reverseSort,
                 FoldersFirst = foldersFirst,
+                FilterExtensions = filterExtensions != null && filterExtensions.Count > 0 ? filterExtensions : null,
+                FilterShowsOnlyListed = filterShowsOnlyListed,
             };
             accessErrors = context.AccessErrors;
             followedFolders = context.FollowedFolders;
@@ -379,6 +413,13 @@ namespace trutility
                         }
                     }
 
+                    // Checked only now, so a shortcut that expanded into a
+                    // folder above is never filtered as a file.
+                    if (IsFilteredOut(fileName, context))
+                    {
+                        continue;
+                    }
+
                     fileNodes.Add(new MenuNode(parsed.DisplayName, parsed.SepBefore, parsed.SepAfter)
                     {
                         FilePath = file
@@ -389,6 +430,21 @@ namespace trutility
             {
                 context.AccessErrors.Add(directory);
             }
+        }
+
+        private static bool IsFilteredOut(string fileName, ScanContext context)
+        {
+            if (context.FilterExtensions == null)
+            {
+                return false;
+            }
+
+            string ext = Path.GetExtension(fileName);
+            if (UnfilteredExtensions.Contains(ext))
+            {
+                return false;
+            }
+            return context.FilterExtensions.Contains(ext) != context.FilterShowsOnlyListed;
         }
 
         /// <summary>

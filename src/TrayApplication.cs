@@ -337,19 +337,31 @@ namespace trutility
             Root userRoot = RootsLib.GetUserRoot();
             EnsureFoldersExist(globalRoots, userRoot);
 
+            // Categories are hide lists, and mean nothing once only the custom
+            // list is shown.
+            bool showOnlyListed = NumberSetting.ExtensionFilterMode.Value() == 1;
+            HashSet<string> filter = MenuBuilder.ParseExtensions(StringSetting.ExtensionFilter.Value()
+                + (showOnlyListed ? "" : ", " + FilterCategory.HiddenExtensions()));
+            bool filterMenu = filter.Count > 0 && ToggleSetting.FilterMenu.IsOn();
+            bool filterSearch = filter.Count > 0 && ToggleSetting.FilterSearch.IsOn();
+
             List<string> accessErrors;
             List<string> followedFolders;
-            MenuNode tree = MenuBuilder.BuildTree(
-                globalRoots, userRoot, out accessErrors, out followedFolders,
-                ToggleSetting.ShowExtensions.IsOn(),
-                ToggleSetting.ExpandFolderShortcuts.IsOn() ? NumberSetting.AutoExpandLimit.Value() : 0,
-                (MenuSort)NumberSetting.SortBy.Value(),
-                ToggleSetting.ReverseSort.IsOn(), ToggleSetting.FoldersFirst.IsOn());
+            MenuNode tree = ScanTree(globalRoots, userRoot, filterMenu ? filter : null, showOnlyListed,
+                                     out accessErrors, out followedFolders);
 
             // Read once here so the index and the box always agree: no index
             // means no box, and a menu without search costs nothing for it.
-            IReadOnlyList<SearchEntry> searchIndex =
-                ToggleSetting.EnableSearch.IsOn() ? MenuSearch.Index(tree) : null;
+            // shortcut: filtering only one of menu and search scans every folder
+            // twice; prune a copy of one tree instead if that ever shows up as slow.
+            IReadOnlyList<SearchEntry> searchIndex = null;
+            if (ToggleSetting.EnableSearch.IsOn())
+            {
+                MenuNode searchTree = filterSearch == filterMenu
+                    ? tree
+                    : ScanTree(globalRoots, userRoot, filterSearch ? filter : null, showOnlyListed, out _, out _);
+                searchIndex = MenuSearch.Index(searchTree);
+            }
             List<string> watchPaths = CollectWatchPaths(globalRoots, userRoot, followedFolders);
             string userRootPath = userRoot.Path;
 
@@ -363,6 +375,21 @@ namespace trutility
             // The menu is already usable at this point; this only fills the
             // cache the next open will read from.
             WarmIconCache(tree, token);
+        }
+
+        /// Scans every folder with the current settings, passing on only those
+        /// files the extension filter keeps, or all of them for a null filter.
+        private static MenuNode ScanTree(IReadOnlyList<Root> globalRoots, Root userRoot,
+                                         HashSet<string> filter, bool showOnlyListed,
+                                         out List<string> accessErrors, out List<string> followedFolders)
+        {
+            return MenuBuilder.BuildTree(
+                globalRoots, userRoot, out accessErrors, out followedFolders,
+                ToggleSetting.ShowExtensions.IsOn(),
+                ToggleSetting.ExpandFolderShortcuts.IsOn() ? NumberSetting.AutoExpandLimit.Value() : 0,
+                (MenuSort)NumberSetting.SortBy.Value(),
+                ToggleSetting.ReverseSort.IsOn(), ToggleSetting.FoldersFirst.IsOn(),
+                filter, showOnlyListed);
         }
 
         /// <summary>

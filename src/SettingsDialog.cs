@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Windows.Forms;
 
@@ -33,6 +34,13 @@ namespace trutility
         private RadioButton[] _sortOptions;
         private CheckBox _chkReverseSort;
         private CheckBox _chkFoldersFirst;
+        private TextBox _txtFilter;
+        private RadioButton[] _filterModes;
+        private CheckBox[] _chkCategories;
+        private FlowLayoutPanel _categoryButtons;
+        private CheckBox _chkFilterMenu;
+        private CheckBox _chkFilterSearch;
+        private bool _filterSearchManaged;
         private CheckBox _chkEnableSearch;
         private CheckBox _chkFocusSearch;
         private NumericUpDown _numSearchDelay;
@@ -99,6 +107,7 @@ namespace trutility
 
             AddPage("General", BuildUserGroup(), BuildSettingsGroup());
             AddPage("Advanced", BuildAdvancedSettings(), BuildSortingGroup());
+            AddPage("Filtering", BuildCategoryGroup(), BuildFilterGroup(), BuildFilterScopeGroup());
             AddPage("About", BuildHeader(), BuildHelpGroup());
 
             // What the tab strip and the border take up around a page.
@@ -407,6 +416,134 @@ namespace trutility
                 choices.Enabled ? "Sorting" : "Sorting   [Managed by Administrator]", stack);
         }
 
+        private Control BuildFilterGroup()
+        {
+            bool listManaged = StringSetting.ExtensionFilter.IsManagedByPolicy();
+            Label caption = new Label
+            {
+                Text = "File types, separated by ';' (.lnk; .exe; .msc; .cpl; .rdp; are always shown)",
+                AutoSize = true,
+            };
+            _txtFilter = new TextBox
+            {
+                Text = StringSetting.ExtensionFilter.Value(),
+                Width = 300,
+                Enabled = !listManaged,
+            };
+
+            // In ExtensionFilterMode order, so a button's position is the value it stands for.
+            _filterModes = new[]
+            {
+                new RadioButton { Text = "Hide these file types", AutoSize = true },
+                new RadioButton { Text = "Show only these file types", AutoSize = true },
+            };
+            _filterModes[NumberSetting.ExtensionFilterMode.Value() == 1 ? 1 : 0].Checked = true;
+            FlowLayoutPanel modes = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Margin = Padding.Empty,
+                Enabled = !NumberSetting.ExtensionFilterMode.IsManagedByPolicy(),
+            };
+            modes.Controls.AddRange(_filterModes);
+
+            // Show only makes every hide list redundant, so the categories
+            // are greyed out rather than left to contradict it.
+            _filterModes[1].CheckedChanged += (s, e) => UpdateCategoryAvailability();
+            UpdateCategoryAvailability();
+
+            FlowLayoutPanel stack = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+            };
+            stack.Controls.AddRange(new Control[] { caption, _txtFilter, modes });
+            return NewGroup(
+                listManaged ? "Custom file types   [Managed by Administrator]" : "Custom file types", stack);
+        }
+
+        private Control BuildCategoryGroup()
+        {
+            _chkCategories = FilterCategory.All
+                .Select(c => NewSetting(c.Name + "  (" + c.Extensions + ")",
+                                        c.Setting.IsOn(), c.Setting.IsManagedByPolicy()))
+                .ToArray();
+
+            Button all = new Button { Text = "Select all", AutoSize = true };
+            all.Click += (s, e) => SetAllCategories(true);
+            Button none = new Button { Text = "Select none", AutoSize = true };
+            none.Click += (s, e) => SetAllCategories(false);
+            _categoryButtons = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Margin = Padding.Empty,
+            };
+            _categoryButtons.Controls.AddRange(new Control[] { all, none });
+
+            FlowLayoutPanel stack = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+            };
+            stack.Controls.AddRange(_chkCategories);
+            stack.Controls.Add(_categoryButtons);
+            return NewGroup("Hide these file types", stack);
+        }
+
+        /// Leaves alone any category an administrator manages.
+        private void SetAllCategories(bool on)
+        {
+            foreach (CheckBox box in _chkCategories.Where(b => b.Enabled))
+            {
+                box.Checked = on;
+            }
+        }
+
+        private Control BuildFilterScopeGroup()
+        {
+            _chkFilterMenu = NewSetting(
+                "Menu item tree",
+                ToggleSetting.FilterMenu.IsOn(), ToggleSetting.FilterMenu.IsManagedByPolicy());
+            _filterSearchManaged = ToggleSetting.FilterSearch.IsManagedByPolicy();
+            _chkFilterSearch = NewSetting(
+                "Search results",
+                ToggleSetting.FilterSearch.IsOn(), _filterSearchManaged);
+
+            // The General tab is built first, so search is already known here.
+            UpdateSearchAvailability();
+
+            FlowLayoutPanel stack = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+            };
+            stack.Controls.AddRange(new Control[] { _chkFilterMenu, _chkFilterSearch });
+            return NewGroup("Apply filters to", stack);
+        }
+
+        private void UpdateCategoryAvailability()
+        {
+            if (_chkCategories == null) return;
+
+            for (int i = 0; i < _chkCategories.Length; i++)
+            {
+                _chkCategories[i].Enabled =
+                    !FilterCategory.All[i].Setting.IsManagedByPolicy() && !_filterModes[1].Checked;
+            }
+            _categoryButtons.Enabled = !_filterModes[1].Checked;
+        }
+
         /// A box for a numeric setting, starting at its current value.
         private static NumericUpDown NewNumberBox(NumberSetting setting, int maximum)
         {
@@ -466,12 +603,18 @@ namespace trutility
             _numExpandLimit.Enabled = !_expandLimitManaged && _chkExpand.Checked;
         }
 
-        /// With no search box there is nothing to focus and nothing to delay,
-        /// so both options are greyed out for as long as search is unticked.
+        /// With no search box there is nothing to focus, delay or filter, so
+        /// those options are greyed out for as long as search is unticked.
         private void UpdateSearchAvailability()
         {
             _chkFocusSearch.Enabled = !_focusSearchManaged && _chkEnableSearch.Checked;
             _numSearchDelay.Enabled = !_searchDelayManaged && _chkEnableSearch.Checked;
+
+            // Not built yet on the first call, from the General tab.
+            if (_chkFilterSearch != null)
+            {
+                _chkFilterSearch.Enabled = !_filterSearchManaged && _chkEnableSearch.Checked;
+            }
         }
 
         private static CheckBox NewSetting(string text, bool value, bool managed)
@@ -656,6 +799,10 @@ namespace trutility
             {
                 MenuNeedsRebuild = true;
             }
+            if (ApplyFilterSettings())
+            {
+                MenuNeedsRebuild = true;
+            }
 
             // Saved even while greyed out by search being off: that only means
             // there is nothing to focus right now, and the choice should still
@@ -699,6 +846,40 @@ namespace trutility
                 // Applied once: a later Apply or OK has nothing new to save.
                 _userRootChanged = false;
             }
+        }
+
+        /// True when anything the menu is built from changed.
+        private bool ApplyFilterSettings()
+        {
+            bool changed = false;
+            if (_txtFilter.Enabled)
+            {
+                changed |= StringSetting.ExtensionFilter.SaveIfChanged(_txtFilter.Text.Trim());
+            }
+            if (!NumberSetting.ExtensionFilterMode.IsManagedByPolicy())
+            {
+                changed |= NumberSetting.ExtensionFilterMode.SaveIfChanged(_filterModes[1].Checked ? 1 : 0);
+            }
+            // Saved while greyed out by Show only too, so the choice is still
+            // there when hiding comes back. Only policy prevents it.
+            for (int i = 0; i < _chkCategories.Length; i++)
+            {
+                ToggleSetting setting = FilterCategory.All[i].Setting;
+                if (!setting.IsManagedByPolicy())
+                {
+                    changed |= setting.SaveIfChanged(_chkCategories[i].Checked);
+                }
+            }
+            if (_chkFilterMenu.Enabled)
+            {
+                changed |= ToggleSetting.FilterMenu.SaveIfChanged(_chkFilterMenu.Checked);
+            }
+            // Saved while greyed out by search being off, like the focus choice.
+            if (!_filterSearchManaged)
+            {
+                changed |= ToggleSetting.FilterSearch.SaveIfChanged(_chkFilterSearch.Checked);
+            }
+            return changed;
         }
 
         private void OnChangeUserRoot(object sender, EventArgs e)

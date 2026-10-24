@@ -49,7 +49,7 @@ Exit
 
 `.lnk` and `.url` always lose their extension in the menu, since the shortcut is not the point. Other files show theirs — `eventvwr.msc` stays `eventvwr.msc` — unless extensions are turned off in Settings. Folder names are never cut at a dot.
 
-Within each folder, files are listed before subfolders, parted by a thin line — the order can be changed in [Settings](#settings). `desktop.ini` and `thumbs.db` are ignored; everything else becomes an entry.
+Within each folder, files are listed before subfolders, parted by a thin line — the order can be changed in [Settings](#settings). `desktop.ini` and `thumbs.db` are ignored; everything else becomes an entry, unless the Filtering tab in [Settings](#settings) removes it.
 
 ## Organising the menu
 
@@ -125,7 +125,7 @@ A result behaves like any other entry, so Shift+Click and Ctrl+Click work on it 
 
 ## Settings
 
-Click the tray icon → **Settings**. The dialog has three tabs.
+Click the tray icon → **Settings**. The dialog has four tabs.
 
 **General**
 
@@ -149,6 +149,25 @@ Click the tray icon → **Settings**. The dialog has three tabs.
 - **Sorting** — the order of files within each folder: by name (the default), by date modified with the newest first, or by extension. For a shortcut both the date and the extension are the shortcut's own, not its target's. Submenus always stay in name order.
   - **Reverse order** — turns the chosen order around: Z to A, oldest first. Submenus are reversed too.
   - **Folders before files** — lists submenus above the files of each folder instead of below them.
+
+**Filtering** — keeps file types out of the menu. `.lnk`, `.exe`, `.msc` and `.cpl` are always shown whatever is set here, and so is a shortcut that opens as a submenu. A folder left with nothing in it disappears from the menu.
+
+- **Hide these file types** — all off by default; each checkbox lists the file types it covers, and **Select all** / **Select none** tick or clear them together.
+
+  | Category | File types |
+  |---|---|
+  | Images | png, jpg, jpeg, gif, bmp, ico, svg, webp, tif, tiff |
+  | Web pages | html, htm, mht, css |
+  | Config files | ini, cfg, conf, config, xml, json, yaml, yml, toml, inf |
+  | Program files | dll, sys, ocx, pdb, manifest, dat, bin, mui |
+  | Logs and misc | log, tmp, bak, old, dmp, etl |
+  | Media | mp3, wav, mp4, avi, mkv, mov |
+  | Fonts | ttf, otf, fon |
+
+  Nothing that runs is in any category: scripts, `.reg`, `.msi` and `.url` are what a launcher is for.
+- **Custom file types** — your own list, such as `png, jpg, ico`. Commas, semicolons and spaces all work as separators, the dot is optional. Empty by default.
+  - **Hide these file types** (the default) adds them to the categories above. **Show only these file types** hides everything else, and the categories are greyed out since there is nothing left for them to hide.
+- **Apply filters to** — **Menu item tree** and **Search results**, both on by default. **Search results** is greyed out while the search box is off. With only one of them on, a filtered file can still be found in the other, at the cost of every folder being scanned twice.
 
 **About** — what trutility is, and the naming suffixes and click actions at a glance.
 
@@ -245,6 +264,11 @@ Under `HKLM\SOFTWARE\trutility`:
 | `SortBy` | `REG_DWORD` | Order of files within a folder: 0 by name, 1 by date (newest first), 2 by extension. |
 | `ReverseSort` | `REG_DWORD` | Chosen order reversed, or not. |
 | `FoldersFirst` | `REG_DWORD` | Submenus listed above files, or below. |
+| `HideImages`, `HideWebPages`, `HideConfigFiles`, `HideProgramFiles`, `HideLogsAndMisc`, `HideMedia`, `HideFonts` | `REG_DWORD` | That category of file types hidden, or not. |
+| `ExtensionFilter` | `REG_SZ` | Custom file types, e.g. `png, jpg`. Empty means none. |
+| `ExtensionFilterMode` | `REG_DWORD` | 0 hides the custom types, 1 shows only them and ignores the categories. |
+| `FilterMenu` | `REG_DWORD` | Filters applied to the menu, or not. |
+| `FilterSearch` | `REG_DWORD` | Filters applied to search results, or not. |
 | `SearchDelayMs` | `REG_DWORD` | Pause after typing before a search runs, in milliseconds. 0 means the default of 1000. |
 | `ConfirmDeleteFiles` | `REG_DWORD` | Deleting a file or shortcut asks first, or not. |
 | `ConfirmDeleteFolders` | `REG_DWORD` | Deleting a real folder asks first, or not. |
