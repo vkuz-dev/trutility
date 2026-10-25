@@ -56,6 +56,11 @@ namespace trutility
         /// The corner of the open menu kept in place while its size changes.
         private MenuAnchor _anchor;
 
+        /// The point the menu is about to be opened from, when that is not the
+        /// cursor - a hotkey opening it in a corner of the screen. Cleared
+        /// again when the menu closes.
+        public Point? OpenedFrom { get; set; }
+
         /// <summary>
         /// Puts the box at the top of an empty menu. Add the tree items next,
         /// then call CaptureTree so the box knows which items it may swap out.
@@ -103,7 +108,7 @@ namespace trutility
 
             menu.Opened += (s, e) =>
             {
-                _anchor = MenuAnchor.Detect(_menu.Bounds, Cursor.Position);
+                _anchor = MenuAnchor.Detect(_menu.Bounds, OpenedFrom ?? Cursor.Position);
 
                 // Read on every open, like the focus setting below.
                 _debounce.Interval = Settings.NumberSetting.SearchDelayMs.Value();
@@ -116,7 +121,11 @@ namespace trutility
                     _box.Focus();
                 }
             };
-            menu.Closed += (s, e) => _anchor = null;
+            menu.Closed += (s, e) =>
+            {
+                _anchor = null;
+                OpenedFrom = null;
+            };
             menu.Disposed += (s, e) =>
             {
                 _debounce.Dispose();

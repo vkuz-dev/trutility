@@ -46,6 +46,9 @@ namespace trutility
         private NumericUpDown _numSearchDelay;
         private bool _searchDelayManaged;
         private bool _focusSearchManaged;
+        private HotkeyBox _hotkeyBox;
+        private ComboBox _cmbHotkeyPosition;
+        private bool _hotkeyPositionManaged;
         private CheckBox _chkConfirmFiles;
         private CheckBox _chkConfirmFolders;
         private bool _confirmFilesManaged;
@@ -305,6 +308,9 @@ namespace trutility
             _numSearchDelay = NewNumberBox(NumberSetting.SearchDelayMs, 10000); // max value
             Control delayRow = NewNumberRow(_numSearchDelay, "Search delay after typing, in milliseconds");
 
+            Control hotkeyRow = BuildHotkeyRow();
+            Control positionRow = BuildHotkeyPositionRow();
+
             _chkEnableSearch.CheckedChanged += (s, e) => UpdateSearchAvailability();
             UpdateSearchAvailability();
 
@@ -317,9 +323,93 @@ namespace trutility
             };
             stack.Controls.AddRange(new Control[]
             {
-                _chkShell, _chkStartup, _chkDesktop, _chkStartMenu, _chkTrayPin, _chkEnableSearch, _chkFocusSearch, delayRow,
+                _chkShell, _chkStartup, _chkDesktop, _chkStartMenu, _chkTrayPin, _chkEnableSearch, _chkFocusSearch, delayRow, hotkeyRow, positionRow,
             });
             return NewGroup("Settings", stack);
+        }
+
+        /// The box with its caption to the right, like the number rows.
+        private Control BuildHotkeyRow()
+        {
+            bool managed = StringSetting.Hotkey.IsManagedByPolicy();
+            _hotkeyBox = new HotkeyBox
+            {
+                Keys = GlobalHotkey.Parse(StringSetting.Hotkey.Value()),
+                Width = 110,
+                Anchor = AnchorStyles.Left,
+                Enabled = !managed,
+            };
+
+            Label label = new Label
+            {
+                Text = managed
+                    ? "Hotkey to open the menu   [Managed by Administrator]"
+                    : "Hotkey to open the menu (Backspace for none)",
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+            };
+
+            FlowLayoutPanel row = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Margin = Padding.Empty,
+            };
+            row.Controls.AddRange(new Control[] { _hotkeyBox, label });
+            return row;
+        }
+
+        private Control BuildHotkeyPositionRow()
+        {
+            _hotkeyPositionManaged = NumberSetting.HotkeyMenuPosition.IsManagedByPolicy();
+
+            // In MenuPosition order, so an entry's position is the value it stands for.
+            _cmbHotkeyPosition = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 110,
+                Anchor = AnchorStyles.Left,
+            };
+            _cmbHotkeyPosition.Items.AddRange(new object[]
+            {
+                "Bottom right", "Bottom left", "Top right", "Top left", "Mouse cursor",
+            });
+
+            // A stored value that is none of these is shown as bottom right,
+            // which is also where the hotkey opens the menu for it.
+            int current = NumberSetting.HotkeyMenuPosition.Value();
+            _cmbHotkeyPosition.SelectedIndex = current < _cmbHotkeyPosition.Items.Count ? current : 0;
+
+            Label label = new Label
+            {
+                Text = _hotkeyPositionManaged
+                    ? "Where the hotkey opens the menu   [Managed by Administrator]"
+                    : "Where the hotkey opens the menu",
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+            };
+
+            // With no hotkey there is nothing to position.
+            _hotkeyBox.TextChanged += (s, e) => UpdateHotkeyPositionAvailability();
+            UpdateHotkeyPositionAvailability();
+
+            FlowLayoutPanel row = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Margin = Padding.Empty,
+            };
+            row.Controls.AddRange(new Control[] { _cmbHotkeyPosition, label });
+            return row;
+        }
+
+        private void UpdateHotkeyPositionAvailability()
+        {
+            _cmbHotkeyPosition.Enabled = !_hotkeyPositionManaged && _hotkeyBox.Keys != Keys.None;
         }
 
         private Control BuildAdvancedSettings()
@@ -810,6 +900,19 @@ namespace trutility
             if (!_focusSearchManaged)
             {
                 ToggleSetting.FocusSearch.SaveIfChanged(_chkFocusSearch.Checked);
+            }
+
+            // Registered by whoever opened the dialog, once it closes.
+            if (_hotkeyBox.Enabled)
+            {
+                StringSetting.Hotkey.SaveIfChanged(GlobalHotkey.Format(_hotkeyBox.Keys));
+            }
+
+            // Saved while greyed out by having no hotkey too, so the choice is
+            // still there when one is set again. Read each time the hotkey fires.
+            if (!_hotkeyPositionManaged)
+            {
+                NumberSetting.HotkeyMenuPosition.SaveIfChanged(_cmbHotkeyPosition.SelectedIndex);
             }
 
             // Read at the moment of deleting, so no rebuild.

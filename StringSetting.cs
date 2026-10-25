@@ -15,6 +15,9 @@ namespace trutility.Settings
         /// default, which means no filter at all.
         public static readonly StringSetting ExtensionFilter = new StringSetting("ExtensionFilter", "");
 
+        /// The key combination that opens the menu, e.g. "Ctrl+Alt+S", in the form GlobalHotkey.Parse reads. Empty means no hotkey.
+        public static readonly StringSetting Hotkey = new StringSetting("Hotkey", "Ctrl+Alt+S");
+
         private const string RegKeyPath = @"SOFTWARE\trutility";
 
         private readonly string _valueName;

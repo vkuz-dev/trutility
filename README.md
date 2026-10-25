@@ -137,6 +137,8 @@ Click the tray icon → **Settings**. The dialog has four tabs.
 - **Enable search box** — on by default; turned off, the menu has no search box at all
 - **Focus search box by default** — on by default, and greyed out while search is off; see [Searching](#searching)
 - **Search delay** — 1000 milliseconds by default, and greyed out while search is off; how long to wait after the last keystroke before searching. Setting it to 0 or leaving it empty puts 1000 back.
+- **Hotkey to open the menu** — `Ctrl+Alt+S` by default; click the box and press the combination you want, which must include Ctrl or Alt. Backspace or Delete sets it to none. If another program already uses the combination, a notification says so when you close Settings.
+- **Where the hotkey opens the menu** — bottom right by default, or another corner, or at the mouse cursor. The corners are those of the screen the mouse is on, beside the taskbar rather than over it. Greyed out while there is no hotkey.
 - **Your folder** — change its location, reset it, or open it
 
 **Advanced**
@@ -272,6 +274,8 @@ Under `HKLM\SOFTWARE\trutility`:
 | `SearchDelayMs` | `REG_DWORD` | Pause after typing before a search runs, in milliseconds. 0 means the default of 1000. |
 | `ConfirmDeleteFiles` | `REG_DWORD` | Deleting a file or shortcut asks first, or not. |
 | `ConfirmDeleteFolders` | `REG_DWORD` | Deleting a real folder asks first, or not. |
+| `Hotkey` | `REG_SZ` | Combination that opens the menu, e.g. `Ctrl+Alt+S`. Empty means no hotkey. |
+| `HotkeyMenuPosition` | `REG_DWORD` | Where the hotkey opens the menu: 0 bottom right, 1 bottom left, 2 top right, 3 top left, 4 at the mouse cursor. |
 
 These apply to anyone who has not already changed the setting themselves — the dialog then shows it greyed out as managed. **A user who changed it before the policy arrived keeps their own choice**, because the matching `HKCU` value shadows `HKLM`. To re-assert one, delete it from `HKCU\SOFTWARE\trutility` as well.
 

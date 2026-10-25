@@ -20,6 +20,9 @@ namespace trutility.Settings
         /// them (the default), 1 shows only them.
         public static readonly NumberSetting ExtensionFilterMode = new NumberSetting("ExtensionFilterMode", 0);
 
+        /// Where the hotkey opens the menu, as a MenuPosition value. Bottom right by default.
+        public static readonly NumberSetting HotkeyMenuPosition = new NumberSetting("HotkeyMenuPosition", 0);
+
         private const string RegKeyPath = @"SOFTWARE\trutility";
 
         private readonly string _valueName;

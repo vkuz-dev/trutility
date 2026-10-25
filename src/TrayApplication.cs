@@ -5,6 +5,7 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -174,7 +175,9 @@ namespace trutility
         // ── UI components ─────────────────────────────────────────────────────
         private readonly NotifyIcon _notifyIcon;
         private ContextMenuStrip _menu;
+        private MenuSearchBox _search;
         private readonly Control _invokeHelper;
+        private readonly GlobalHotkey _hotkey;
 
         // ── File watchers ─────────────────────────────────────────────────────
         // One watcher per folder currently on the menu: every root plus every
@@ -227,6 +230,10 @@ namespace trutility
 
             _notifyIcon.MouseClick += OnTrayClick;
 
+            _hotkey = new GlobalHotkey();
+            _hotkey.Pressed += (s, e) => ShowMenuFromHotkey();
+            ApplyHotkey(tellUser: false);
+
             _recoveryTimer = new System.Windows.Forms.Timer { Interval = RecoveryPollMs };
             _recoveryTimer.Tick += (s, e) => BuildMenuAsync();
 
@@ -240,13 +247,86 @@ namespace trutility
         {
             if (e.Button == MouseButtons.Left || e.Button == MouseButtons.Right)
             {
-                if (_menu != null)
-                {
-                    MethodInfo mi = typeof(NotifyIcon).GetMethod("ShowContextMenu",
-                        BindingFlags.Instance | BindingFlags.NonPublic);
-                    mi?.Invoke(_notifyIcon, null);
-                }
+                ShowMenu();
             }
+        }
+
+        // NotifyIcon's own way of opening its menu, because it also brings
+        // trutility to the foreground so the menu closes on a click elsewhere.
+        private void ShowMenu()
+        {
+            if (_menu == null) return;
+
+            MethodInfo mi = typeof(NotifyIcon).GetMethod("ShowContextMenu",
+                BindingFlags.Instance | BindingFlags.NonPublic);
+            mi?.Invoke(_notifyIcon, null);
+        }
+
+        // ── Hotkey ────────────────────────────────────────────────────────────
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        /// <summary>
+        /// Opens the menu in the chosen corner, growing away from it. A value
+        /// that is none of the positions counts as bottom right, the default.
+        /// </summary>
+        private void ShowMenuFromHotkey()
+        {
+            MenuPosition position = (MenuPosition)NumberSetting.HotkeyMenuPosition.Value();
+            if (position == MenuPosition.Cursor)
+            {
+                ShowMenu();
+                return;
+            }
+            if (_menu == null) return;
+
+            bool right = position != MenuPosition.BottomLeft && position != MenuPosition.TopLeft;
+            bool bottom = position != MenuPosition.TopRight && position != MenuPosition.TopLeft;
+
+            Rectangle area = Screen.FromPoint(Cursor.Position).WorkingArea;
+            Point corner = new Point(right ? area.Right : area.Left, bottom ? area.Bottom : area.Top);
+            ToolStripDropDownDirection direction = bottom
+                ? (right ? ToolStripDropDownDirection.AboveLeft : ToolStripDropDownDirection.AboveRight)
+                : (right ? ToolStripDropDownDirection.BelowLeft : ToolStripDropDownDirection.BelowRight);
+
+            BringToForeground();
+            if (_search != null) _search.OpenedFrom = corner;
+            _menu.Show(corner, direction);
+        }
+
+        /// <summary>
+        /// What NotifyIcon does before opening its own menu. Without it the menu
+        /// stays open after a click in another program, and the search box
+        /// cannot take the keyboard. Windows allows it because the hotkey was
+        /// the last input.
+        /// </summary>
+        private void BringToForeground()
+        {
+            FieldInfo fi = typeof(NotifyIcon).GetField("window", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (fi?.GetValue(_notifyIcon) is NativeWindow window)
+            {
+                SetForegroundWindow(window.Handle);
+            }
+            else
+            {
+                Diag.Swallowed("finding the tray icon window");
+            }
+        }
+
+        /// <summary>
+        /// Registers the stored combination. A clash is only reported after the
+        /// user picked the combination: at logon it would be a balloon every
+        /// day about something they did not just do.
+        /// </summary>
+        private void ApplyHotkey(bool tellUser)
+        {
+            Keys keys = GlobalHotkey.Parse(StringSetting.Hotkey.Value());
+            if (_hotkey.Register(keys) || !tellUser) return;
+
+            _notifyIcon.ShowBalloonTip(4000, "trutility",
+                GlobalHotkey.Format(keys) + " is already used by another program. Pick a different hotkey in Settings.",
+                ToolTipIcon.Warning);
         }
 
         // ── Folder setup ──────────────────────────────────────────────────────
@@ -254,11 +334,7 @@ namespace trutility
         /// <summary>
         /// Creates the folder belonging to the user, and the built-in global
         /// folder when trutility picked that location itself.
-        ///
-        /// An administrator-provisioned root is never created. Conjuring one
-        /// would turn a mistyped policy path into a silently empty folder rather
-        /// than a visible mistake, and would scatter stray directories across
-        /// whichever share the path pointed at.
+
         /// </summary>
         private static void EnsureFoldersExist(IReadOnlyList<Root> globalRoots, Root userRoot)
         {
@@ -395,17 +471,6 @@ namespace trutility
         /// <summary>
         /// Loads every icon in the tree into the cache, on the thread that just
         /// finished the scan.
-        ///
-        /// A shell icon lookup costs a few milliseconds and has to happen once
-        /// per file no matter what. The only real choice is which thread pays
-        /// and when: building the menu with them froze the tray when a folder
-        /// was added, and loading them on open put a hitch on every first look
-        /// inside a folder - which is the far more frequent event. Here the UI
-        /// thread pays neither, and a menu that is opened later finds every icon
-        /// already cached.
-        ///
-        /// Breadth-first, so the levels most likely to be opened are ready
-        /// first, and abandoned as soon as a newer rebuild supersedes this one.
         /// </summary>
         private static void WarmIconCache(MenuNode root, CancellationToken token)
         {
@@ -432,15 +497,6 @@ namespace trutility
             }
         }
 
-        /// <summary>
-        /// Warns only about folders the user can actually do something about.
-        ///
-        /// A denied or unreachable global root is an administrator matter: the
-        /// user cannot change its permissions and cannot bring its share back,
-        /// so a balloon would only nag on every rebuild. Those are recorded for
-        /// support instead, which is what answers "my department folder is
-        /// missing" without a reproduction.
-        /// </summary>
         private void ReportAccessErrors(List<string> accessErrors, string userRootPath)
         {
             HashSet<string> current = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -504,6 +560,7 @@ namespace trutility
 
             ContextMenuStrip old = _menu;
             _menu = newMenu;
+            _search = search;
             _notifyIcon.ContextMenuStrip = newMenu;
             old?.Dispose();
         }
@@ -832,9 +889,15 @@ namespace trutility
 
         private void OnSettings(object sender, EventArgs e)
         {
+            // Released while the dialog is open, so pressing the current
+            // combination in the hotkey box reaches the box instead of
+            // opening the menu.
+            _hotkey.Unregister();
+
             using (SettingsDialog dlg = new SettingsDialog(RootsLib.GetUserRoot(), RefreshMenu, BuildMenuAsync))
             {
                 dlg.ShowDialog();
+                ApplyHotkey(tellUser: true);
                 // A new folder location or a display change both need a rebuild;
                 // for a new location it also creates the folder and re-points
                 // the watchers.
@@ -1009,6 +1072,7 @@ namespace trutility
             _debounceCts?.Dispose();
             _recoveryTimer?.Stop();
             _recoveryTimer?.Dispose();
+            _hotkey?.Dispose();
             foreach (FileSystemWatcher watcher in _watchers.Values)
                 watcher.Dispose();
             _watchers.Clear();
