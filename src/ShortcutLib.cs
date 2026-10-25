@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 
 namespace trutility
 {
@@ -13,14 +14,16 @@ namespace trutility
         public static bool TryResolveTarget(string lnkPath, out string targetPath)
         {
             targetPath = null;
+            object shell = null;
+            object shortcut = null;
             try
             {
                 Type wshType = Type.GetTypeFromProgID("WScript.Shell");
                 if (wshType == null) return false;
 
-                dynamic shell = Activator.CreateInstance(wshType);
-                dynamic shortcut = shell.CreateShortcut(lnkPath);
-                string target = shortcut.TargetPath;
+                shell = Activator.CreateInstance(wshType);
+                shortcut = ((dynamic)shell).CreateShortcut(lnkPath);
+                string target = ((dynamic)shortcut).TargetPath;
 
                 if (string.IsNullOrWhiteSpace(target)) return false;
 
@@ -33,6 +36,21 @@ namespace trutility
                 // the scan it was found in.
                 Diag.Swallowed("resolving shortcut " + lnkPath, ex);
                 return false;
+            }
+            finally
+            {
+                // Released now rather than left to the finalizer: every scan
+                // resolves every shortcut in the tree.
+                Release(shortcut);
+                Release(shell);
+            }
+        }
+
+        private static void Release(object com)
+        {
+            if (com != null && Marshal.IsComObject(com))
+            {
+                Marshal.ReleaseComObject(com);
             }
         }
     }

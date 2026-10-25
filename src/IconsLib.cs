@@ -67,7 +67,7 @@ namespace trutility
         /// </summary>
         public static Bitmap GetIcon(string filePath)
         {
-            return Copy(Resolve(filePath));
+            return Resolve(filePath, copy: true);
         }
 
         /// <summary>
@@ -80,11 +80,16 @@ namespace trutility
         /// </summary>
         public static void Prewarm(string filePath)
         {
-            Resolve(filePath);
+            Resolve(filePath, copy: false);
         }
 
-        /// Returns the cached instance itself, which only Copy may hand out.
-        private static Bitmap Resolve(string filePath)
+        /// <summary>
+        /// Returns a copy of the icon when asked for one, else null. The copy is
+        /// taken under the same lock that found or stored the cached bitmap:
+        /// outside it, a background prewarm filling the cache or a Refresh can
+        /// dispose that bitmap before it is copied.
+        /// </summary>
+        private static Bitmap Resolve(string filePath, bool copy)
         {
             if (string.IsNullOrWhiteSpace(filePath))
             {
@@ -98,21 +103,25 @@ namespace trutility
                 Bitmap hit;
                 if (Cache.TryGetValue(key, out hit))
                 {
-                    return hit;
+                    return copy ? Copy(hit) : null;
                 }
             }
 
             Bitmap fetched = Fetch(filePath);
 
-            // A failure is only remembered for type-wide icons. A per-file icon
-            // that could not be read may simply be on a share that is down, and
-            // caching the miss would keep it blank for the rest of the session.
-            if (fetched != null || !IsPerFileIcon(filePath))
+            lock (CacheLock)
             {
-                Store(key, fetched);
-            }
+                Bitmap result = copy ? Copy(fetched) : null;
 
-            return fetched;
+                // A failure is only remembered for type-wide icons. A per-file icon
+                // that could not be read may simply be on a share that is down, and
+                // caching the miss would keep it blank for the rest of the session.
+                if (fetched != null || !IsPerFileIcon(filePath))
+                {
+                    StoreLocked(key, fetched);
+                }
+                return result;
+            }
         }
 
         /// <summary>
@@ -127,16 +136,13 @@ namespace trutility
             }
         }
 
-        private static void Store(string key, Bitmap value)
+        private static void StoreLocked(string key, Bitmap value)
         {
-            lock (CacheLock)
+            if (Cache.Count >= MaxCacheEntries)
             {
-                if (Cache.Count >= MaxCacheEntries)
-                {
-                    DisposeAllLocked();
-                }
-                Cache[key] = value;
+                DisposeAllLocked();
             }
+            Cache[key] = value;
         }
 
         private static void DisposeAllLocked()

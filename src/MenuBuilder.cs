@@ -117,6 +117,9 @@ namespace trutility
             public List<string> AccessErrors;
             public List<string> FollowedFolders;
             public HashSet<string> VisitedFolders;
+
+            /// UNC share roots that did not answer during this scan.
+            public HashSet<string> DeadShares = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             public IReadOnlyList<Root> AllRoots;
             public IReadOnlyList<string> ForeignRoots;
             public bool ShowExtensions;
@@ -426,7 +429,7 @@ namespace trutility
                     });
                 }
             }
-            catch (UnauthorizedAccessException)
+            catch (Exception ex) when (IsUnreadable(ex))
             {
                 context.AccessErrors.Add(directory);
             }
@@ -499,11 +502,19 @@ namespace trutility
                     }
                 }
             }
-            catch (UnauthorizedAccessException)
+            catch (Exception ex) when (IsUnreadable(ex))
             {
                 context.AccessErrors.Add(directory);
             }
         }
+
+        /// <summary>
+        /// Denied, or gone mid-scan: a share that dropped, a folder renamed or
+        /// deleted while it was being read. Either costs that one folder, not
+        /// the whole rebuild.
+        /// </summary>
+        private static bool IsUnreadable(Exception ex) =>
+            ex is UnauthorizedAccessException || ex is IOException;
 
         /// <summary>
         /// Expands a shortcut to a folder into a submenu, or returns null when it
@@ -513,7 +524,7 @@ namespace trutility
         private static MenuNode TryFollow(string linkPath, ParsedName parsed, ScanContext context, int limit)
         {
             string target;
-            if (!ShortcutLib.TryResolveTarget(linkPath, out target) || !Directory.Exists(target))
+            if (!ShortcutLib.TryResolveTarget(linkPath, out target) || !TargetExists(target, context))
             {
                 return null;
             }
@@ -557,6 +568,47 @@ namespace trutility
         }
 
         /// <summary>
+        /// Directory.Exists on a share whose server is gone waits out an SMB
+        /// timeout, and every shortcut into it would pay that again, one after
+        /// another, on every rebuild. A share found unreachable once is skipped
+        /// for the rest of the scan. Only the share root itself is remembered,
+        /// so a missing folder on a live share costs nothing elsewhere.
+        /// </summary>
+        private static bool TargetExists(string target, ScanContext context)
+        {
+            string share = UncShare(target);
+            if (share != null && context.DeadShares.Contains(share))
+            {
+                return false;
+            }
+
+            if (Directory.Exists(target))
+            {
+                return true;
+            }
+
+            if (share != null && !Directory.Exists(share))
+            {
+                context.DeadShares.Add(share);
+            }
+            return false;
+        }
+
+        /// "\\server\share" out of a UNC path, or null for anything else.
+        private static string UncShare(string path)
+        {
+            if (!path.StartsWith(@"\\", StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            string[] parts = path.Substring(2).Split(new[] { '\\' }, 3);
+            return parts.Length >= 2 && parts[0].Length > 0 && parts[1].Length > 0
+                ? @"\\" + parts[0] + @"\" + parts[1]
+                : null;
+        }
+
+        /// <summary>
         /// Counts everything under a folder, giving up one past the limit so a
         /// whole drive costs no more to turn down than a small folder does to
         /// accept. A folder that cannot be read all the way through is turned
@@ -569,7 +621,7 @@ namespace trutility
                 return Directory.EnumerateFileSystemEntries(folder, "*", SearchOption.AllDirectories)
                     .Take(limit + 1).Count() <= limit;
             }
-            catch (Exception ex) when (ex is UnauthorizedAccessException || ex is IOException)
+            catch (Exception ex) when (IsUnreadable(ex))
             {
                 return false;
             }
