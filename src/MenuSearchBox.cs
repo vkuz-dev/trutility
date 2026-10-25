@@ -473,12 +473,5 @@ namespace trutility
             // always, since the menu opens with the cursor in it.
             SendMessage(_box.TextBox.Handle, EM_SETCUEBANNER, (IntPtr)1, "Search…");
         }
-
-        /// For tests: the text currently in the box.
-        internal string Text
-        {
-            get { return _box.Text; }
-            set { _box.Text = value; }
-        }
     }
 }

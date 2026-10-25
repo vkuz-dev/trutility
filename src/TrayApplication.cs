@@ -22,32 +22,8 @@ namespace trutility
     /// </summary>
     internal sealed class TrayApplication : IDisposable
     {
-        // ── Folder paths ──────────────────────────────────────────────────────
-        //
-        // Resolution lives in RootsLib, which is the single place that knows how
-        // folders are configured. The two accessors below are the remaining
-        // single-root call sites; they are replaced by the full root list when
-        // the menu builder and watchers are ported.
-
-        /// First resolved global root. Identical to the previous behaviour while
-        /// no Roots keys exist, since the legacy GlobalRoot value and the built-in
-        /// default both resolve to the "Default" root at Order 0.
-        internal static string GlobalRoot
-        {
-            get
-            {
-                IReadOnlyList<Root> roots = RootsLib.GetGlobalRoots();
-                return roots.Count > 0 ? roots[0].Path : RootsLib.ResolveBuiltInGlobalPath();
-            }
-        }
-
         /// The folder belonging to the user - the only one trutility writes to.
         internal static string UserRoot => RootsLib.ResolveUserRootPath();
-
-        internal static void SetUserRoot(string path) => RootsLib.SetUserRoot(path);
-
-        /// True when HKLM pins the location and HKCU has no explicit override yet.
-        internal static bool IsUserRootManagedByPolicy() => RootsLib.IsUserRootManagedByPolicy();
 
         // ── Shell verb helpers ────────────────────────────────────────────────
 
@@ -398,8 +374,14 @@ namespace trutility
             List<string> watchPaths = CollectWatchPaths(globalRoots, userRoot, followedFolders);
             string userRootPath = userRoot.Path;
 
+            // A newer rebuild started while this one scanned. Its result is the
+            // current one, even if this slower scan finishes after it.
+            if (token.IsCancellationRequested) return;
+
             _invokeHelper.BeginInvoke((Action)(() =>
             {
+                if (token.IsCancellationRequested) return;
+
                 ApplyNewMenu(tree, searchIndex);
                 ReportAccessErrors(accessErrors, userRootPath);
                 SyncWatchers(watchPaths);
@@ -821,8 +803,7 @@ namespace trutility
                 string userRoot = UserRoot;
                 Directory.CreateDirectory(userRoot);
 
-                string lnkName = Path.GetFileNameWithoutExtension(sourcePath) + ".lnk";
-                string dest = Path.Combine(userRoot, lnkName);
+                string dest = UniqueShortcutPath(userRoot, sourcePath);
 
                 // Create a proper shell shortcut via WScript.Shell progid at runtime
                 Type wshType = Type.GetTypeFromProgID("WScript.Shell");
@@ -840,6 +821,31 @@ namespace trutility
                 MessageBox.Show($"Could not add shortcut:\n{ex.Message}",
                     "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
+        }
+
+        /// <summary>
+        /// A folder keeps its whole name - "v1.2" is not "v1" - and a drive
+        /// root is named after its letter. A name already taken gets " (2)",
+        /// " (3)"..., since saving over it would silently replace a shortcut
+        /// the user made earlier.
+        /// </summary>
+        private static string UniqueShortcutPath(string userRoot, string sourcePath)
+        {
+            string trimmed = sourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            string name = Directory.Exists(sourcePath)
+                ? Path.GetFileName(trimmed)
+                : Path.GetFileNameWithoutExtension(trimmed);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                name = "Drive " + trimmed.TrimEnd(':');
+            }
+
+            string dest = Path.Combine(userRoot, name + ".lnk");
+            for (int i = 2; File.Exists(dest); i++)
+            {
+                dest = Path.Combine(userRoot, $"{name} ({i}).lnk");
+            }
+            return dest;
         }
 
         // ── Settings dialog ───────────────────────────────────────────────────
@@ -955,7 +961,20 @@ namespace trutility
             }
         }
 
-        private void OnFolderChanged(object sender, FileSystemEventArgs e) => BuildMenuAsync();
+        /// <summary>
+        /// A write to a file changes nothing on the menu unless files are
+        /// ordered by date. Without this, a tool logging next to itself on a
+        /// watched share rescanned every folder every few hundred milliseconds.
+        /// </summary>
+        private void OnFolderChanged(object sender, FileSystemEventArgs e)
+        {
+            if (e.ChangeType == WatcherChangeTypes.Changed
+                && (MenuSort)NumberSetting.SortBy.Value() != MenuSort.Date)
+            {
+                return;
+            }
+            BuildMenuAsync();
+        }
 
         /// <summary>
         /// A watcher over SMB dies on a network blip, and any watcher dies when

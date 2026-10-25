@@ -214,7 +214,7 @@ namespace trutility
 
         private Control BuildUserGroup()
         {
-            bool managed = TrayApplication.IsUserRootManagedByPolicy();
+            bool managed = RootsLib.IsUserRootManagedByPolicy();
 
             // The path is the one thing that must not set the width: a deep
             // folder would stretch the whole dialog. It asks for 1px, fills
@@ -843,9 +843,9 @@ namespace trutility
                 ToggleSetting.AddToShell.SaveIfChanged(_chkShell.Checked);
             }
 
-            ShortcutSetting.Startup.Set(_chkStartup.Checked);
-            ShortcutSetting.Desktop.Set(_chkDesktop.Checked);
-            ShortcutSetting.StartMenu.Set(_chkStartMenu.Checked);
+            ApplyShortcutSetting(ShortcutSetting.Startup, _chkStartup.Checked, "the Startup shortcut");
+            ApplyShortcutSetting(ShortcutSetting.Desktop, _chkDesktop.Checked, "the Desktop shortcut");
+            ApplyShortcutSetting(ShortcutSetting.StartMenu, _chkStartMenu.Checked, "the Start Menu shortcut");
 
             if (_chkTrayPin.Enabled)
                 SettingsTrayPin.SaveTrayPin(_chkTrayPin.Checked);
@@ -947,6 +947,24 @@ namespace trutility
 
                 // Applied once: a later Apply or OK has nothing new to save.
                 _userRootChanged = false;
+            }
+        }
+
+        /// <summary>
+        /// A shortcut write can fail - a locked file, or a redirected Desktop
+        /// that is offline - and must not cost every setting saved after it.
+        /// </summary>
+        private static void ApplyShortcutSetting(ShortcutSetting setting, bool enable, string what)
+        {
+            try
+            {
+                setting.Set(enable);
+            }
+            catch (Exception ex)
+            {
+                Diag.Swallowed("updating " + what, ex);
+                MessageBox.Show($"Could not update {what}:\n\n{ex.Message}",
+                    "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
 
