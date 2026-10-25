@@ -287,8 +287,10 @@ namespace trutility
             _chkDesktop = NewSetting(
                 "Create Desktop shortcut", ShortcutSetting.Desktop.IsEnabled(), ShortcutSetting.Desktop.IsGlobal());
 
+            // A package puts trutility in Start itself.
             _chkStartMenu = NewSetting(
                 "Create Start Menu shortcut", ShortcutSetting.StartMenu.IsEnabled(), ShortcutSetting.StartMenu.IsGlobal());
+            _chkStartMenu.Visible = !PackageInfo.IsPackaged;
 
             _chkTrayPin = NewSetting(
                 "Pin icon to tray", ToggleSetting.PinToTray.IsOn(), ToggleSetting.PinToTray.IsManagedByPolicy());
@@ -845,7 +847,8 @@ namespace trutility
 
             ApplyShortcutSetting(ShortcutSetting.Startup, _chkStartup.Checked, "the Startup shortcut");
             ApplyShortcutSetting(ShortcutSetting.Desktop, _chkDesktop.Checked, "the Desktop shortcut");
-            ApplyShortcutSetting(ShortcutSetting.StartMenu, _chkStartMenu.Checked, "the Start Menu shortcut");
+            if (!PackageInfo.IsPackaged)
+                ApplyShortcutSetting(ShortcutSetting.StartMenu, _chkStartMenu.Checked, "the Start Menu shortcut");
 
             if (_chkTrayPin.Enabled)
                 SettingsTrayPin.SaveTrayPin(_chkTrayPin.Checked);

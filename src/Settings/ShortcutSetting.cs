@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
 
@@ -39,8 +38,7 @@ namespace trutility.Settings
 
         private string GlobalFolder => Environment.GetFolderPath(_globalFolder);
 
-        private static string AppProcessPath =>
-            Process.GetCurrentProcess().MainModule.FileName;
+        private static string AppProcessPath => PackageInfo.LaunchPath;
 
         private static string AppBaseName =>
             Path.GetFileNameWithoutExtension(AppProcessPath);
@@ -81,6 +79,15 @@ namespace trutility.Settings
             {
                 RemoveShortcutsIn(UserFolder);
             }
+        }
+
+        /// Points an existing user shortcut at the running exe again. It goes
+        /// stale when the exe moves: a package update, or a switch between the
+        /// exe and the Store version.
+        public void Refresh()
+        {
+            if (FindExistingShortcut(UserFolder) != null)
+                Set(true);
         }
 
         // ── Private helpers ───────────────────────────────────────────────────

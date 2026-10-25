@@ -43,6 +43,21 @@ namespace trutility
             else UnregisterShellVerb();
         }
 
+        private static void RefreshShortcuts()
+        {
+            foreach (ShortcutSetting setting in new[] { ShortcutSetting.Startup, ShortcutSetting.Desktop })
+            {
+                try
+                {
+                    setting.Refresh();
+                }
+                catch (Exception ex)
+                {
+                    Diag.Swallowed("refreshing a shortcut", ex);
+                }
+            }
+        }
+
         // ── Shell context-menu registration ───────────────────────────────────
         private const string ShellRegBaseFiles = @"Software\Classes\*\shell\AddToTrutility";
         private const string ShellCommandFiles = @"Software\Classes\*\shell\AddToTrutility\command";
@@ -51,7 +66,11 @@ namespace trutility
 
         internal static void RegisterShellVerb()
         {
+            // The icon comes from the real exe: an execution alias has none.
+            // It goes stale when a package updates, until the next start
+            // registers the verb again.
             string exe = Assembly.GetExecutingAssembly().Location;
+            string launch = PackageInfo.LaunchPath;
 
             // Register for files
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(ShellRegBaseFiles))
@@ -60,7 +79,7 @@ namespace trutility
                 key.SetValue("Icon", $"\"{exe}\"");
             }
             using (RegistryKey cmd = Registry.CurrentUser.CreateSubKey(ShellCommandFiles))
-                cmd.SetValue(null, $"\"{exe}\" --add \"%1\"");
+                cmd.SetValue(null, $"\"{launch}\" --add \"%1\"");
 
             // Register for folders
             using (RegistryKey key = Registry.CurrentUser.CreateSubKey(ShellRegBaseFolders))
@@ -69,7 +88,7 @@ namespace trutility
                 key.SetValue("Icon", $"\"{exe}\"");
             }
             using (RegistryKey cmd = Registry.CurrentUser.CreateSubKey(ShellCommandFolders))
-                cmd.SetValue(null, $"\"{exe}\" --add \"%1\"");
+                cmd.SetValue(null, $"\"{launch}\" --add \"%1\"");
         }
 
         internal static void UnregisterShellVerb()
@@ -160,6 +179,9 @@ namespace trutility
             // because Windows creates the NotifyIconSettings registry key only
             // once the icon is shown via Shell_NotifyIcon(NIM_ADD).
             SettingsTrayPin.ApplyTrayPin();
+
+            // Off the UI thread: a redirected Desktop can sit on a slow share.
+            Task.Run(() => RefreshShortcuts());
 
             _notifyIcon.MouseClick += OnTrayClick;
 
