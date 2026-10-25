@@ -35,4 +35,11 @@
     <Reference Include="Microsoft.VisualBasic" />
   </ItemGroup>
 
+  <!-- The test project sits below this one, so keep its files out of the exe. -->
+  <ItemGroup>
+    <Compile Remove="tests\**" />
+    <None Remove="tests\**" />
+    <InternalsVisibleTo Include="trutility.Tests" />
+  </ItemGroup>
+
 </Project>
