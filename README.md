@@ -116,7 +116,7 @@ payroll.xlsx       Finance ▸ Reports
 | Key | Effect |
 |---|---|
 | **Up** / **Down** | move the highlight through the entries — results, or the whole top level while the box is empty — wrapping at the ends |
-| **Enter** | launch the highlighted entry, or the top result when nothing is highlighted — straight away, without waiting for the pause |
+| **Enter** | launch the highlighted entry — straight away, without waiting for the pause. New results start with the top one highlighted. |
 | **Shift** + **Enter** | launch it as Administrator |
 | **Right** or **Enter** on a folder | open its submenu |
 | **Esc** | clear the box; press it again to close the menu |

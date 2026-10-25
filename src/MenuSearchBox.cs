@@ -298,6 +298,10 @@ namespace trutility
             _fillIcons(_menu.Items);
             _menu.ResumeLayout();
             FitWidth();
+
+            // Enter launches the best match anyway, so it is highlighted to
+            // show that before Enter is pressed.
+            _resultItems.Find(IsStop)?.Select();
         }
 
         private void AddResult(ToolStripItem item)
@@ -358,8 +362,9 @@ namespace trutility
         /// <summary>
         /// The keyboard never leaves the box, so the box moves the highlight
         /// itself: Up and Down walk every entry of the menu, tree or results,
-        /// and wrap at the ends. Enter launches the highlighted entry, or the
-        /// best match when nothing is highlighted, and Shift+Enter launches it
+        /// and wrap at the ends. New results start with the best match
+        /// highlighted. Enter launches the highlighted entry, or the best
+        /// match when nothing is highlighted, and Shift+Enter launches it
         /// as administrator, the same as Shift+Click. Enter or Right on a
         /// folder opens it. Esc clears the box, and a second Esc closes the
         /// menu as usual.
