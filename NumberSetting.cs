@@ -1,5 +1,3 @@
-using System;
-
 using Microsoft.Win32;
 
 namespace trutility.Settings
@@ -23,8 +21,6 @@ namespace trutility.Settings
         /// Where the hotkey opens the menu, as a MenuPosition value. Bottom right by default.
         public static readonly NumberSetting HotkeyMenuPosition = new NumberSetting("HotkeyMenuPosition", 0);
 
-        private const string RegKeyPath = @"SOFTWARE\trutility";
-
         private readonly string _valueName;
         private readonly int _default;
 
@@ -39,8 +35,7 @@ namespace trutility.Settings
         /// A stored zero or less counts as not set, the same as in the dialog.
         public int Value()
         {
-            object val = ReadValue(Registry.CurrentUser) ?? ReadValue(Registry.LocalMachine);
-            int number = val == null ? 0 : Convert.ToInt32(val);
+            int number = SettingStore.ToInt(SettingStore.Read(_valueName), 0);
             return number > 0 ? number : _default;
         }
 
@@ -53,34 +48,11 @@ namespace trutility.Settings
                 return false;
             }
 
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RegKeyPath))
-            {
-                key?.SetValue(_valueName, value, RegistryValueKind.DWord);
-            }
+            SettingStore.Write(_valueName, value, RegistryValueKind.DWord);
             return true;
         }
 
         /// True when HKLM carries the value and HKCU has no override yet.
-        public bool IsManagedByPolicy()
-        {
-            return ReadValue(Registry.CurrentUser) == null
-                && ReadValue(Registry.LocalMachine) != null;
-        }
-
-        private object ReadValue(RegistryKey hive)
-        {
-            try
-            {
-                using (RegistryKey key = hive.OpenSubKey(RegKeyPath))
-                {
-                    return key?.GetValue(_valueName);
-                }
-            }
-            catch (Exception ex)
-            {
-                Diag.Swallowed("reading " + _valueName, ex);
-                return null;
-            }
-        }
+        public bool IsManagedByPolicy() => SettingStore.IsManagedByPolicy(_valueName);
     }
 }

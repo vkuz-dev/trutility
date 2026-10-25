@@ -1,5 +1,3 @@
-using System;
-
 using Microsoft.Win32;
 
 namespace trutility.Settings
@@ -18,8 +16,6 @@ namespace trutility.Settings
         /// The key combination that opens the menu, e.g. "Ctrl+Alt+S", in the form GlobalHotkey.Parse reads. Empty means no hotkey.
         public static readonly StringSetting Hotkey = new StringSetting("Hotkey", "Ctrl+Alt+S");
 
-        private const string RegKeyPath = @"SOFTWARE\trutility";
-
         private readonly string _valueName;
         private readonly string _default;
 
@@ -31,7 +27,7 @@ namespace trutility.Settings
 
         public string Value()
         {
-            object val = ReadValue(Registry.CurrentUser) ?? ReadValue(Registry.LocalMachine);
+            object val = SettingStore.Read(_valueName);
             return val == null ? _default : val.ToString();
         }
 
@@ -44,34 +40,11 @@ namespace trutility.Settings
                 return false;
             }
 
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RegKeyPath))
-            {
-                key?.SetValue(_valueName, value, RegistryValueKind.String);
-            }
+            SettingStore.Write(_valueName, value, RegistryValueKind.String);
             return true;
         }
 
         /// True when HKLM carries the value and HKCU has no override yet.
-        public bool IsManagedByPolicy()
-        {
-            return ReadValue(Registry.CurrentUser) == null
-                && ReadValue(Registry.LocalMachine) != null;
-        }
-
-        private object ReadValue(RegistryKey hive)
-        {
-            try
-            {
-                using (RegistryKey key = hive.OpenSubKey(RegKeyPath))
-                {
-                    return key?.GetValue(_valueName);
-                }
-            }
-            catch (Exception ex)
-            {
-                Diag.Swallowed("reading " + _valueName, ex);
-                return null;
-            }
-        }
+        public bool IsManagedByPolicy() => SettingStore.IsManagedByPolicy(_valueName);
     }
 }

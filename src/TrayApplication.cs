@@ -22,10 +22,6 @@ namespace trutility
     /// </summary>
     internal sealed class TrayApplication : IDisposable
     {
-        // ── Registry ──────────────────────────────────────────────────────────
-        private const string RegKeyPath = @"SOFTWARE\trutility";
-        private const string RegValShell = "AddToShell";
-
         // ── Folder paths ──────────────────────────────────────────────────────
         //
         // Resolution lives in RootsLib, which is the single place that knows how
@@ -58,56 +54,17 @@ namespace trutility
         /// HKCU → HKLM → actual verb registration (legacy fallback).
         internal static bool IsShellVerbEnabled()
         {
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
-            {
-                object val = key?.GetValue(RegValShell);
-                if (val != null) return Convert.ToInt32(val) != 0;
-            }
-            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
-            {
-                object val = key?.GetValue(RegValShell);
-                if (val != null) return Convert.ToInt32(val) != 0;
-            }
-            return IsShellVerbRegistered();
+            return ToggleSetting.AddToShell.IsSet() ? ToggleSetting.AddToShell.IsOn() : IsShellVerbRegistered();
         }
 
-        /// True when HKLM carries AddToShell but HKCU has no explicit override yet.
-        internal static bool IsShellVerbManagedByPolicy()
-        {
-            using (RegistryKey key = Registry.CurrentUser.OpenSubKey(RegKeyPath))
-                if (key?.GetValue(RegValShell) != null) return false;
-            using (RegistryKey key = Registry.LocalMachine.OpenSubKey(RegKeyPath))
-                return key?.GetValue(RegValShell) != null;
-        }
-
-        internal static void SaveShellPref(bool enable)
-        {
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RegKeyPath))
-                key?.SetValue(RegValShell, enable ? 1 : 0, RegistryValueKind.DWord);
-        }
-
-        /// Applies HKLM AddToShell policy on startup when the user has no HKCU override.
+        /// Brings the registration in line with the stored preference or HKLM
+        /// policy at startup. With neither, the registration is left as it is.
         internal static void ApplyShellPolicy()
         {
-            using (RegistryKey hkcu = Registry.CurrentUser.OpenSubKey(RegKeyPath))
-            {
-                object hkcuVal = hkcu?.GetValue(RegValShell);
-                if (hkcuVal != null)
-                {
-                    if (Convert.ToInt32(hkcuVal) != 0) RegisterShellVerb();
-                    else UnregisterShellVerb();
-                    return;
-                }
-            }
-            using (RegistryKey hklm = Registry.LocalMachine.OpenSubKey(RegKeyPath))
-            {
-                object hklmVal = hklm?.GetValue(RegValShell);
-                if (hklmVal != null)
-                {
-                    if (Convert.ToInt32(hklmVal) != 0) RegisterShellVerb();
-                    else UnregisterShellVerb();
-                }
-            }
+            if (!ToggleSetting.AddToShell.IsSet()) return;
+
+            if (ToggleSetting.AddToShell.IsOn()) RegisterShellVerb();
+            else UnregisterShellVerb();
         }
 
         // ── Shell context-menu registration ───────────────────────────────────

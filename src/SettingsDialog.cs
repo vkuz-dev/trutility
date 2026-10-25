@@ -277,10 +277,9 @@ namespace trutility
 
         private Control BuildSettingsGroup()
         {
-            bool shellManaged = TrayApplication.IsShellVerbManagedByPolicy();
             _chkShell = NewSetting(
                 "Enable \"Add to trutility\" in Explorer context menu",
-                TrayApplication.IsShellVerbEnabled(), shellManaged);
+                TrayApplication.IsShellVerbEnabled(), ToggleSetting.AddToShell.IsManagedByPolicy());
 
             _chkStartup = NewSetting(
                 "Run at startup", ShortcutSetting.Startup.IsEnabled(), ShortcutSetting.Startup.IsGlobal());
@@ -291,9 +290,8 @@ namespace trutility
             _chkStartMenu = NewSetting(
                 "Create Start Menu shortcut", ShortcutSetting.StartMenu.IsEnabled(), ShortcutSetting.StartMenu.IsGlobal());
 
-            bool trayPinManaged = SettingsTrayPin.IsManagedByPolicy();
             _chkTrayPin = NewSetting(
-                "Pin icon to tray", SettingsTrayPin.IsPinEnabled(), trayPinManaged);
+                "Pin icon to tray", ToggleSetting.PinToTray.IsOn(), ToggleSetting.PinToTray.IsManagedByPolicy());
 
             _chkEnableSearch = NewSetting(
                 "Enable search box",
@@ -840,8 +838,9 @@ namespace trutility
         {
             if (_chkShell.Enabled)
             {
-                if (_chkShell.Checked) { TrayApplication.RegisterShellVerb(); TrayApplication.SaveShellPref(true); }
-                else { TrayApplication.UnregisterShellVerb(); TrayApplication.SaveShellPref(false); }
+                if (_chkShell.Checked) TrayApplication.RegisterShellVerb();
+                else TrayApplication.UnregisterShellVerb();
+                ToggleSetting.AddToShell.SaveIfChanged(_chkShell.Checked);
             }
 
             ShortcutSetting.Startup.Set(_chkStartup.Checked);

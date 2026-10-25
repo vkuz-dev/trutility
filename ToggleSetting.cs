@@ -1,5 +1,3 @@
-using System;
-
 using Microsoft.Win32;
 
 namespace trutility.Settings
@@ -67,7 +65,13 @@ namespace trutility.Settings
         /// On by default.
         public static readonly ToggleSetting ConfirmDeleteFolders = new ToggleSetting("ConfirmDeleteFolders", true);
 
-        private const string RegKeyPath = @"SOFTWARE\trutility";
+        /// Whether Explorer's context menu offers "Add to trutility". Unset, it
+        /// follows whether the verb is actually registered, for installs that
+        /// predate the setting.
+        public static readonly ToggleSetting AddToShell = new ToggleSetting("AddToShell", false);
+
+        /// Whether the tray icon is pinned outside the overflow area. Off by default.
+        public static readonly ToggleSetting PinToTray = new ToggleSetting("PinToTray", false);
 
         private readonly string _valueName;
         private readonly bool _default;
@@ -80,12 +84,13 @@ namespace trutility.Settings
 
         public bool IsOn()
         {
-            object val = ReadValue(Registry.CurrentUser) ?? ReadValue(Registry.LocalMachine);
-            if (val == null)
-            {
-                return _default;
-            }
-            return Convert.ToInt32(val) != 0;
+            return SettingStore.ToInt(SettingStore.Read(_valueName), _default ? 1 : 0) != 0;
+        }
+
+        /// True when either hive carries a value, so the default is not in play.
+        public bool IsSet()
+        {
+            return SettingStore.Read(_valueName) != null;
         }
 
         /// Only written when it actually changes: saving the default would pin
@@ -97,34 +102,11 @@ namespace trutility.Settings
                 return false;
             }
 
-            using (RegistryKey key = Registry.CurrentUser.CreateSubKey(RegKeyPath))
-            {
-                key?.SetValue(_valueName, on ? 1 : 0, RegistryValueKind.DWord);
-            }
+            SettingStore.Write(_valueName, on ? 1 : 0, RegistryValueKind.DWord);
             return true;
         }
 
         /// True when HKLM carries the value and HKCU has no override yet.
-        public bool IsManagedByPolicy()
-        {
-            return ReadValue(Registry.CurrentUser) == null
-                && ReadValue(Registry.LocalMachine) != null;
-        }
-
-        private object ReadValue(RegistryKey hive)
-        {
-            try
-            {
-                using (RegistryKey key = hive.OpenSubKey(RegKeyPath))
-                {
-                    return key?.GetValue(_valueName);
-                }
-            }
-            catch (Exception ex)
-            {
-                Diag.Swallowed("reading " + _valueName, ex);
-                return null;
-            }
-        }
+        public bool IsManagedByPolicy() => SettingStore.IsManagedByPolicy(_valueName);
     }
 }

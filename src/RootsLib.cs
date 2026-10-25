@@ -656,7 +656,7 @@ namespace trutility
             return string.IsNullOrWhiteSpace(raw) ? null : raw;
         }
 
-        private static int ToInt(object value, int fallback)
+        internal static int ToInt(object value, int fallback)
         {
             try
             {
