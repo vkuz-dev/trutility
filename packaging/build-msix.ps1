@@ -41,7 +41,24 @@ if (Test-Path $layout) { Remove-Item -Recurse -Force $layout }
 New-Item -ItemType Directory -Force $layout | Out-Null
 $bin = Join-Path $repo "bin\Release\net462-windows"
 Copy-Item (Join-Path $bin "trutility.exe"), (Join-Path $bin "trutility.exe.config") $layout
-Copy-Item -Recurse (Join-Path $PSScriptRoot "Assets") $layout
+
+# The manifest's logos are scaled down from the one large source image, since
+# Windows' own scaling of a 1024px image to 44px looks blurry on the taskbar.
+Add-Type -AssemblyName System.Drawing
+$assets = New-Item -ItemType Directory -Force (Join-Path $layout "Assets")
+$source = [System.Drawing.Image]::FromFile((Join-Path $PSScriptRoot "Assets\trutility_1024x1024.png"))
+try {
+    foreach ($logo in @{ "Square150x150Logo.png" = 150; "Square44x44Logo.png" = 44; "StoreLogo.png" = 50 }.GetEnumerator()) {
+        $bitmap = New-Object System.Drawing.Bitmap $logo.Value, $logo.Value
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+        $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+        $graphics.DrawImage($source, 0, 0, $logo.Value, $logo.Value)
+        $graphics.Dispose()
+        $bitmap.Save((Join-Path $assets $logo.Key), [System.Drawing.Imaging.ImageFormat]::Png)
+        $bitmap.Dispose()
+    }
+} finally { $source.Dispose() }
 
 (Get-Content -Raw (Join-Path $PSScriptRoot "AppxManifest.xml")).
     Replace('$NAME$', $Name).
