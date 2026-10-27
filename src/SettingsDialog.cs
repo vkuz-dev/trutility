@@ -172,10 +172,13 @@ namespace trutility
             {
                 Text =
                     "Your files, folders and programs, one click away.\n\n" +
-                    "trutility is a menu that lives next to the clock. Click its icon and pick what you want to open,\n" +
-                    "with no digging through folders or the Start menu.\n\n" +
-                    "To add something, create a shortcut(or a file) - in Your folder on the General tab. Turn on\n" +
-                    "\"Add to trutility\" there to add things with a right-click in Explorer.\n\n" +
+
+                    "trutility adds a menu next to the clock that mirrors a folder on your PC.\n" +
+                    "Each subfolder becomes a submenu, and each file or shortcut becomes a menu item.\n\n" +
+
+                    "To get started, open Your folder from the General tab and put shortcuts or\n" +
+                    "files in it. Turn on \"Add to trutility\" to add items by right-clicking them in Explorer.\n\n" +
+                    
                     "Author: Vladimir Kuznetsov",
                 AutoSize = true,
                 Margin = Padding.Empty,
@@ -197,7 +200,37 @@ namespace trutility
                 WrapContents = false,
             };
             header.Controls.AddRange(new Control[] { about, link });
-            return header;
+
+            FlowLayoutPanel row = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+            };
+            row.Controls.AddRange(new Control[] { BuildLogo(), header });
+            return row;
+        }
+
+        private static PictureBox BuildLogo()
+        {
+            const int size = 96;
+            Bitmap scaled = new Bitmap(size, size);
+            using (Stream stream = Assembly.GetExecutingAssembly().GetManifestResourceStream("trutility.logo.png"))
+            using (Image source = Image.FromStream(stream))
+            using (Graphics g = Graphics.FromImage(scaled))
+            {
+                g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.HighQualityBicubic;
+                g.PixelOffsetMode = System.Drawing.Drawing2D.PixelOffsetMode.HighQuality;
+                g.DrawImage(source, 0, 0, size, size);
+            }
+
+            return new PictureBox
+            {
+                Image = scaled,
+                Size = scaled.Size,
+                Margin = new Padding(0, 0, 16, 0),
+            };
         }
 
         private static void OpenLink(string url)
