@@ -432,7 +432,54 @@ namespace trutility
                 return true;
             }
 
+            if (keyData == (Keys.Control | Keys.Back) || keyData == (Keys.Control | Keys.Delete))
+            {
+                DeleteWord(key == Keys.Back);
+                return true;
+            }
+
             return false;
+        }
+
+        private void DeleteWord(bool backward)
+        {
+            TextBox box = _box.TextBox;
+            string text = box.Text;
+            int start = box.SelectionStart;
+            int end = start + box.SelectionLength;
+
+            if (start == end)
+            {
+                if (backward)
+                {
+                    while (start > 0 && char.IsWhiteSpace(text[start - 1]))
+                    {
+                        start--;
+                    }
+                    while (start > 0 && !char.IsWhiteSpace(text[start - 1]))
+                    {
+                        start--;
+                    }
+                }
+                else
+                {
+                    while (end < text.Length && char.IsWhiteSpace(text[end]))
+                    {
+                        end++;
+                    }
+                    while (end < text.Length && !char.IsWhiteSpace(text[end]))
+                    {
+                        end++;
+                    }
+                }
+            }
+
+            if (start == end)
+            {
+                return;
+            }
+            box.Text = text.Remove(start, end - start);
+            box.SelectionStart = start;
         }
 
         private static bool IsStop(ToolStripItem item)
