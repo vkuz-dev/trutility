@@ -317,6 +317,17 @@ namespace trutility
 
             _chkStartup = NewSetting(
                 "Run at startup", ShortcutSetting.Startup.IsEnabled(), ShortcutSetting.Startup.IsGlobal());
+            _chkStartup.Visible = !PackageInfo.IsPackaged;
+
+            // The package's startup task (AppxManifest.xml) is switched in Windows,
+            // since the package cannot write to the real Startup folder.
+            LinkLabel startupLink = new LinkLabel
+            {
+                Text = "Run at startup: turn on in Windows Settings > Apps > Startup",
+                AutoSize = true,
+                Visible = PackageInfo.IsPackaged,
+            };
+            startupLink.LinkClicked += (s, e) => OpenLink("ms-settings:startupapps");
 
             _chkDesktop = NewSetting(
                 "Create Desktop shortcut", ShortcutSetting.Desktop.IsEnabled(), ShortcutSetting.Desktop.IsGlobal());
@@ -358,7 +369,7 @@ namespace trutility
             };
             stack.Controls.AddRange(new Control[]
             {
-                _chkShell, _chkStartup, _chkDesktop, _chkStartMenu, _chkTrayPin, _chkEnableSearch, _chkFocusSearch, delayRow, hotkeyRow, positionRow, themeRow,
+                _chkShell, _chkStartup, startupLink, _chkDesktop, _chkStartMenu, _chkTrayPin, _chkEnableSearch, _chkFocusSearch, delayRow, hotkeyRow, positionRow, themeRow,
             });
             return NewGroup("Settings", stack);
         }
@@ -922,10 +933,12 @@ namespace trutility
                 ToggleSetting.AddToShell.SaveIfChanged(_chkShell.Checked);
             }
 
-            ApplyShortcutSetting(ShortcutSetting.Startup, _chkStartup.Checked, "the Startup shortcut");
             ApplyShortcutSetting(ShortcutSetting.Desktop, _chkDesktop.Checked, "the Desktop shortcut");
             if (!PackageInfo.IsPackaged)
+            {
+                ApplyShortcutSetting(ShortcutSetting.Startup, _chkStartup.Checked, "the Startup shortcut");
                 ApplyShortcutSetting(ShortcutSetting.StartMenu, _chkStartMenu.Checked, "the Start Menu shortcut");
+            }
 
             if (_chkTrayPin.Enabled)
                 SettingsTrayPin.SaveTrayPin(_chkTrayPin.Checked);

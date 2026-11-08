@@ -113,8 +113,11 @@ namespace trutility
         /// routinely points Documents at a network share - which would put the
         /// one root that must never be remote on a UNC path for most domain
         /// users. LOCALAPPDATA is never roamed or redirected.
-        internal static string BuiltInUserPath =>
-            System.IO.Path.Combine(
+        /// The Store package uses Documents anyway: MSIX gives a package a
+        /// private copy of LOCALAPPDATA, which Explorer would not show.
+        internal static string BuiltInUserPath => PackageInfo.IsPackaged
+            ? LegacyUserPath
+            : System.IO.Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "trutility");
 
         /// Where the built-in user folder used to live, kept only so an existing
@@ -416,6 +419,11 @@ namespace trutility
             if (IsUserRootManagedByPolicy())
             {
                 return;   // an administrator decides the location; do not shadow it
+            }
+
+            if (PackageInfo.IsPackaged)
+            {
+                return;   // the package's default already is the legacy folder
             }
 
             string legacy = LegacyUserPath;

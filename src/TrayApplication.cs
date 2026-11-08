@@ -45,7 +45,11 @@ namespace trutility
 
         private static void RefreshShortcuts()
         {
-            foreach (ShortcutSetting setting in new[] { ShortcutSetting.Startup, ShortcutSetting.Desktop })
+            // The package has no Startup shortcut of its own, only a startup task.
+            ShortcutSetting[] shortcuts = PackageInfo.IsPackaged
+                ? new[] { ShortcutSetting.Desktop }
+                : new[] { ShortcutSetting.Startup, ShortcutSetting.Desktop };
+            foreach (ShortcutSetting setting in shortcuts)
             {
                 try
                 {

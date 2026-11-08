@@ -25,7 +25,7 @@ trutility turns the contents of watched folders into a searchable tray menu. Add
 
 1. Run `trutility.exe`.
 2. Open the tray menu and choose **Settings** if you want to change its defaults.
-3. Add files, shortcuts, or folders to your personal trutility folder: `%LOCALAPPDATA%\trutility\`
+3. Add files, shortcuts, or folders to your personal trutility folder: `%LOCALAPPDATA%\trutility\` (`Documents\trutility\` for the Microsoft Store version)
 4. Open the tray menu. The items you added appear automatically.
 
 Administrators can also populate the shared folder:
@@ -43,7 +43,7 @@ trutility scans two kinds of folder:
 |Root|Default location|Ownership|Purpose|
 |---|---|---|---|
 |Shared|`C:\ProgramData\trutility\`|Administrator-managed.|Visible machine-wide, for all users|
-|Personal|`%LOCALAPPDATA%\trutility\`|User-managed|Visible only to owner, your personal location|
+|Personal|`%LOCALAPPDATA%\trutility\` (Store version: `Documents\trutility\`)|User-managed|Visible only to owner, your personal location|
 
 Shared folders appear at the top, followed by a thick divider, then the personal folder. Roots are kept separate: two folders with the same name remain two distinct menu entries. A personal entry never replaces a shared one, and neither shared root replaces another.
 

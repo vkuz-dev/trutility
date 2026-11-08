@@ -11,10 +11,9 @@
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
   xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
-  xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap3 desktop desktop4 desktop5 desktop6 com rescap">
+  IgnorableNamespaces="uap uap3 desktop desktop4 desktop5 com rescap">
 
   <Identity Name="$NAME$" Publisher="$PUBLISHER$" Version="$VERSION$" ProcessorArchitecture="x64" />
 
@@ -22,11 +21,6 @@
     <DisplayName>trutility</DisplayName>
     <PublisherDisplayName>$PUBLISHER_DISPLAY$</PublisherDisplayName>
     <Logo>Assets\StoreLogo.png</Logo>
-    <!-- trutility shares %LOCALAPPDATA%\trutility, the Startup folder and
-         HKCU with Explorer and with what it launches, so its writes must land
-         where everyone else looks instead of in a private per-package copy. -->
-    <desktop6:FileSystemWriteVirtualization>disabled</desktop6:FileSystemWriteVirtualization>
-    <desktop6:RegistryWriteVirtualization>disabled</desktop6:RegistryWriteVirtualization>
   </Properties>
 
   <Dependencies>
@@ -52,6 +46,10 @@
             <desktop:ExecutionAlias Alias="trutility.exe" />
           </uap3:AppExecutionAlias>
         </uap3:Extension>
+        <!-- Off until the user turns it on in Settings > Apps > Startup. -->
+        <desktop:Extension Category="windows.startupTask" Executable="trutility.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="trutilityStartup" Enabled="false" DisplayName="trutility" />
+        </desktop:Extension>
         <!-- "Add to trutility" in Explorer: shellext\shellext.cpp. -->
         <com:Extension Category="windows.comServer">
           <com:ComServer>
@@ -76,6 +74,5 @@
 
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
-    <rescap:Capability Name="unvirtualizedResources" />
   </Capabilities>
 </Package>
