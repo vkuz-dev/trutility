@@ -30,6 +30,9 @@ namespace trutility.Settings
 
         private static void ApplyToNotifyIconSettings(int promoted)
         {
+            // Virtualized: the write would land in the package's private hive.
+            if (PackageInfo.IsPackaged) return;
+
             string exePath = Assembly.GetExecutingAssembly().Location;
             string exeFile = Path.GetFileName(exePath).ToLowerInvariant();
 

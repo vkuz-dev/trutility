@@ -52,6 +52,7 @@ namespace trutility
         private ComboBox _cmbTheme;
         private CheckBox _chkConfirmFiles;
         private CheckBox _chkConfirmFolders;
+        private CheckBox _chkShowWelcome;
         private bool _confirmFilesManaged;
         private bool _confirmFoldersManaged;
         private readonly Action _refreshMenu;
@@ -125,7 +126,7 @@ namespace trutility
         /// as wide as the widest section, and every section stretches to it so
         /// their edges line up.
         /// </summary>
-        private static TableLayoutPanel NewColumn(params Control[] rows)
+        internal static TableLayoutPanel NewColumn(params Control[] rows)
         {
             TableLayoutPanel layout = new TableLayoutPanel
             {
@@ -149,7 +150,7 @@ namespace trutility
         }
 
         /// A titled section that grows to fit what is put in it.
-        private static GroupBox NewGroup(string title, Control content)
+        internal static GroupBox NewGroup(string title, Control content)
         {
             GroupBox group = new GroupBox
             {
@@ -213,7 +214,7 @@ namespace trutility
             return row;
         }
 
-        private static PictureBox BuildLogo()
+        internal static PictureBox BuildLogo()
         {
             const int size = 96;
             Bitmap scaled = new Bitmap(size, size);
@@ -234,7 +235,7 @@ namespace trutility
             };
         }
 
-        private static void OpenLink(string url)
+        internal static void OpenLink(string url)
         {
             try
             {
@@ -323,8 +324,9 @@ namespace trutility
             // since the package cannot write to the real Startup folder.
             LinkLabel startupLink = new LinkLabel
             {
-                Text = "Run at startup: turn on in Windows Settings > Apps > Startup",
+                Text = "Run at startup (Open Settings)",
                 AutoSize = true,
+                Margin = new Padding(0, 0, 0, 6),
                 Visible = PackageInfo.IsPackaged,
             };
             startupLink.LinkClicked += (s, e) => OpenLink("ms-settings:startupapps");
@@ -339,6 +341,18 @@ namespace trutility
 
             _chkTrayPin = NewSetting(
                 "Pin icon to tray", ToggleSetting.PinToTray.IsOn(), ToggleSetting.PinToTray.IsManagedByPolicy());
+            _chkTrayPin.Visible = !PackageInfo.IsPackaged;
+
+            // The package's HKCU writes are private, so Explorer never sees IsPromoted;
+            // the user pins the icon in Windows instead.
+            LinkLabel trayPinLink = new LinkLabel
+            {
+                Text = "Pin icon to tray (Open Settings)",
+                AutoSize = true,
+                Margin = new Padding(0, 0, 0, 6),
+                Visible = PackageInfo.IsPackaged,
+            };
+            trayPinLink.LinkClicked += (s, e) => OpenLink("ms-settings:taskbar");
 
             _chkEnableSearch = NewSetting(
                 "Enable search box",
@@ -369,7 +383,7 @@ namespace trutility
             };
             stack.Controls.AddRange(new Control[]
             {
-                _chkShell, _chkStartup, startupLink, _chkDesktop, _chkStartMenu, _chkTrayPin, _chkEnableSearch, _chkFocusSearch, delayRow, hotkeyRow, positionRow, themeRow,
+                _chkStartup, startupLink, _chkTrayPin, trayPinLink, _chkShell, _chkDesktop, _chkStartMenu, _chkEnableSearch, _chkFocusSearch, delayRow, hotkeyRow, positionRow, themeRow,
             });
             return NewGroup("Settings", stack);
         }
@@ -542,7 +556,12 @@ namespace trutility
                 "Ask for confirmation when deleting folders",
                 ToggleSetting.ConfirmDeleteFolders.IsOn(), _confirmFoldersManaged);
 
-            stack.Controls.AddRange(new Control[] { _chkConfirmFiles, _chkConfirmFolders });
+            // The inverse of SkipWelcome, which the welcome sets once it closes.
+            _chkShowWelcome = NewSetting(
+                "Show the welcome window at next startup",
+                !ToggleSetting.SkipWelcome.IsOn(), ToggleSetting.SkipWelcome.IsManagedByPolicy());
+
+            stack.Controls.AddRange(new Control[] { _chkConfirmFiles, _chkConfirmFolders, _chkShowWelcome });
         }
 
         private Control BuildSortingGroup()
@@ -795,7 +814,7 @@ namespace trutility
             }
         }
 
-        private static CheckBox NewSetting(string text, bool value, bool managed)
+        internal static CheckBox NewSetting(string text, bool value, bool managed)
         {
             return new CheckBox
             {
@@ -1024,6 +1043,12 @@ namespace trutility
                 ToggleSetting.ConfirmDeleteFolders.SaveIfChanged(_chkConfirmFolders.Checked);
             }
 
+            // Read at startup.
+            if (_chkShowWelcome.Enabled)
+            {
+                ToggleSetting.SkipWelcome.SaveIfChanged(!_chkShowWelcome.Checked);
+            }
+
             // The same goes for the delay, which is also read as the menu opens.
             if (!_searchDelayManaged)
             {
@@ -1054,7 +1079,7 @@ namespace trutility
         /// A shortcut write can fail - a locked file, or a redirected Desktop
         /// that is offline - and must not cost every setting saved after it.
         /// </summary>
-        private static void ApplyShortcutSetting(ShortcutSetting setting, bool enable, string what)
+        internal static void ApplyShortcutSetting(ShortcutSetting setting, bool enable, string what)
         {
             try
             {
@@ -1104,18 +1129,48 @@ namespace trutility
 
         private void OnChangeUserRoot(object sender, EventArgs e)
         {
-            using FolderBrowserDialog dlg = new FolderBrowserDialog();
-            dlg.Description = "Select the folder where trutility will store your personal shortcuts.";
-            dlg.SelectedPath = _userRoot;
-            dlg.ShowNewFolderButton = true;
-
-            if (dlg.ShowDialog(this) == DialogResult.OK)
+            string picked = PickUserRoot(this, _userRoot);
+            if (picked != null)
             {
-                _userRoot = dlg.SelectedPath;
+                _userRoot = picked;
                 _userRootLabel.Text = _userRoot;
                 _userRootExplicitlyChosen = true;
                 _userRootChanged = true;
             }
+        }
+
+        /// The chosen folder, or null when the user cancels.
+        internal static string PickUserRoot(IWin32Window owner, string current)
+        {
+            using FolderBrowserDialog dlg = new FolderBrowserDialog();
+            dlg.Description = "Select the folder where trutility will store your personal shortcuts.";
+            dlg.SelectedPath = current;
+            dlg.ShowNewFolderButton = true;
+
+            while (dlg.ShowDialog(owner) == DialogResult.OK)
+            {
+                if (!IsPackagePrivate(dlg.SelectedPath))
+                {
+                    return dlg.SelectedPath;
+                }
+                MessageBox.Show(owner,
+                    "The Microsoft Store version cannot use a folder inside AppData: Windows keeps " +
+                    "its copy private to trutility, so Explorer would not show what is in it.\n\n" +
+                    "Please choose another folder.",
+                    "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+            return null;
+        }
+
+        /// MSIX redirects a package's writes under AppData into its own private copy.
+        internal static bool IsPackagePrivate(string path)
+        {
+            if (!PackageInfo.IsPackaged) return false;
+
+            string full = Path.GetFullPath(path).TrimEnd('\\') + "\\";
+            return new[] { Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolder.ApplicationData }
+                .Select(f => Environment.GetFolderPath(f).TrimEnd('\\') + "\\")
+                .Any(root => full.StartsWith(root, StringComparison.OrdinalIgnoreCase));
         }
 
         /// Previews the fallback without applying it, so closing the dialog
@@ -1129,7 +1184,7 @@ namespace trutility
             _userRootChanged = true;
         }
 
-        private static void OpenFolder(string path, bool createIfMissing)
+        internal static void OpenFolder(string path, bool createIfMissing)
         {
             if (string.IsNullOrWhiteSpace(path))
             {

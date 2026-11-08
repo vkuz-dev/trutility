@@ -225,6 +225,30 @@ namespace trutility
 
             // Watchers are established by the rebuild, from the folders it found.
             BuildMenuAsync();
+
+            // Queued until the message loop runs, so the icon is up first.
+            if (!ToggleSetting.SkipWelcome.IsOn())
+            {
+                _invokeHelper.BeginInvoke((Action)ShowWelcome);
+            }
+        }
+
+        /// Shown once: closing it any way counts as seen.
+        private void ShowWelcome()
+        {
+            using (WelcomeDialog dlg = new WelcomeDialog())
+            {
+                dlg.ShowDialog();
+                ToggleSetting.SkipWelcome.SaveIfChanged(true);
+                if (dlg.UserRootChanged)
+                {
+                    BuildMenuAsync();
+                }
+                if (dlg.OpenSettings)
+                {
+                    OnSettings(this, EventArgs.Empty);
+                }
+            }
         }
 
         // ── Tray click ────────────────────────────────────────────────────────

@@ -17,7 +17,7 @@
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
 
     <!-- VERSIONING -->
-    <Version>2.4.0.0</Version>
+    <Version>2.4.1.0</Version>
     <AssemblyVersion>$(Version)</AssemblyVersion>
     <FileVersion>$(Version)</FileVersion>
     <InformationalVersion>$(Version)</InformationalVersion>
@@ -33,6 +33,15 @@
   <ItemGroup>
     <Reference Include="Microsoft.CSharp" />
     <Reference Include="Microsoft.VisualBasic" />
+    <!-- StartupTask for the MSIX build. Both ship with Windows, so nothing is copied to the output. -->
+    <Reference Include="Windows">
+      <HintPath>$(MSBuildProgramFiles32)\Windows Kits\10\UnionMetadata\10.0.26100.0\Windows.winmd</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="System.Runtime.WindowsRuntime">
+      <HintPath>$(WINDIR)\Microsoft.NET\Framework\v4.0.30319\System.Runtime.WindowsRuntime.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
   </ItemGroup>
 
   <!-- Shown in the About tab; BuildLogo looks it up by this name. -->

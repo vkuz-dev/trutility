@@ -23,7 +23,7 @@ trutility turns the contents of watched folders into a searchable tray menu. Add
 
 ## Getting started
 
-1. Run `trutility.exe`.
+1. Run `trutility.exe`. The first time, a welcome window shows where your folder is and how to start trutility with Windows and keep its icon visible.
 2. Open the tray menu and choose **Settings** if you want to change its defaults.
 3. Add files, shortcuts, or folders to your personal trutility folder: `%LOCALAPPDATA%\trutility\` (`Documents\trutility\` for the Microsoft Store version)
 4. Open the tray menu. The items you added appear automatically.
@@ -245,7 +245,8 @@ Administrators can configure settings under `HKLM\SOFTWARE\trutility`.
 |---|---|---|
 |`UserRoot`|`REG_SZ`|Pins the location of the user's personal folder. The user still controls its contents.|
 |`AddToShell`|`REG_DWORD`|Enables or disables the Explorer context-menu entry.|
-|`PinToTray`|`REG_DWORD`|Controls whether the tray icon is pinned.|
+|`PinToTray`|`REG_DWORD`|Controls whether the tray icon is pinned. Ignored by the Microsoft Store version, which Windows does not let pin itself.|
+|`SkipWelcome`|`REG_DWORD`|`1` never shows the first-run welcome window.|
 |`ShowExtensions`|`REG_DWORD`|Controls whether file extensions are shown.|
 |`EnableSearch`|`REG_DWORD`|Shows or hides the search box.|
 |`FocusSearch`|`REG_DWORD`|Controls whether the search box receives keyboard focus when the menu opens.|

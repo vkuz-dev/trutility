@@ -73,6 +73,10 @@ namespace trutility.Settings
         /// Whether the tray icon is pinned outside the overflow area. Off by default.
         public static readonly ToggleSetting PinToTray = new ToggleSetting("PinToTray", false);
 
+        /// Whether the first-run welcome stays hidden. Written once the welcome
+        /// closes; an administrator sets it in HKLM to never show it.
+        public static readonly ToggleSetting SkipWelcome = new ToggleSetting("SkipWelcome", false);
+
         private readonly string _valueName;
         private readonly bool _default;
 
