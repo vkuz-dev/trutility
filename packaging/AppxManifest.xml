@@ -9,9 +9,12 @@
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+  xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+  xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
   xmlns:desktop6="http://schemas.microsoft.com/appx/manifest/desktop/windows10/6"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap3 desktop desktop6 rescap">
+  IgnorableNamespaces="uap uap3 desktop desktop4 desktop5 desktop6 com rescap">
 
   <Identity Name="$NAME$" Publisher="$PUBLISHER$" Version="$VERSION$" ProcessorArchitecture="x64" />
 
@@ -49,6 +52,24 @@
             <desktop:ExecutionAlias Alias="trutility.exe" />
           </uap3:AppExecutionAlias>
         </uap3:Extension>
+        <!-- "Add to trutility" in Explorer: shellext\shellext.cpp. -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:SurrogateServer DisplayName="trutility Explorer command">
+              <com:Class Id="d8df50e1-e6b1-469f-a378-d24474e0080e" Path="trutility.ShellExt.dll" ThreadingModel="STA" />
+            </com:SurrogateServer>
+          </com:ComServer>
+        </com:Extension>
+        <desktop4:Extension Category="windows.fileExplorerContextMenus">
+          <desktop4:FileExplorerContextMenus>
+            <desktop5:ItemType Type="*">
+              <desktop5:Verb Id="AddToTrutility" Clsid="d8df50e1-e6b1-469f-a378-d24474e0080e" />
+            </desktop5:ItemType>
+            <desktop5:ItemType Type="Directory">
+              <desktop5:Verb Id="AddToTrutility" Clsid="d8df50e1-e6b1-469f-a378-d24474e0080e" />
+            </desktop5:ItemType>
+          </desktop4:FileExplorerContextMenus>
+        </desktop4:Extension>
       </Extensions>
     </Application>
   </Applications>

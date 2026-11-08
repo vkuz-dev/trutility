@@ -33,6 +33,18 @@ $layout = Join-Path $out "layout"
 dotnet build (Join-Path $repo "trutility.csproj") -c Release -nologo -v q
 if ($LASTEXITCODE -ne 0) { throw "build failed" }
 
+# The packaged Explorer verb (shellext\) is C++, so packing needs MSVC too.
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+$msbuild = if (Test-Path $vswhere) {
+    & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+        -find "MSBuild\**\Bin\MSBuild.exe" | Select-Object -First 1
+}
+if (-not $msbuild) {
+    throw "MSVC not found. Install it with: winget install Microsoft.VisualStudio.2022.BuildTools --override `"--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive`""
+}
+& $msbuild (Join-Path $repo "shellext\shellext.vcxproj") /p:Configuration=Release /p:Platform=x64 /nologo /v:q
+if ($LASTEXITCODE -ne 0) { throw "shell extension build failed" }
+
 # The Store wants the last version part to be 0, which the csproj already keeps.
 [xml]$proj = Get-Content (Join-Path $repo "trutility.csproj")
 $version = ($proj.Project.PropertyGroup | Where-Object { $_.Version } | Select-Object -First 1).Version
@@ -40,7 +52,8 @@ $version = ($proj.Project.PropertyGroup | Where-Object { $_.Version } | Select-O
 if (Test-Path $layout) { Remove-Item -Recurse -Force $layout }
 New-Item -ItemType Directory -Force $layout | Out-Null
 $bin = Join-Path $repo "bin\Release\net462-windows"
-Copy-Item (Join-Path $bin "trutility.exe"), (Join-Path $bin "trutility.exe.config") $layout
+Copy-Item (Join-Path $bin "trutility.exe"), (Join-Path $bin "trutility.exe.config"),
+    (Join-Path $repo "bin\shellext\trutility.ShellExt.dll") $layout
 
 # The manifest's logos are scaled down from the one large source image, since
 # Windows' own scaling of a 1024px image to 44px looks blurry on the taskbar.

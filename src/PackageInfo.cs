@@ -25,8 +25,22 @@ namespace trutility
                 @"Microsoft\WindowsApps\trutility.exe")
             : Process.GetCurrentProcess().MainModule.FileName;
 
+        /// Null when not packaged.
+        public static readonly string FamilyName = IsPackaged ? ReadFamilyName() : null;
+
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
         private static extern int GetCurrentPackageFullName(ref int length, StringBuilder fullName);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)]
+        private static extern int GetCurrentPackageFamilyName(ref int length, StringBuilder familyName);
+
+        private static string ReadFamilyName()
+        {
+            int length = 0;
+            GetCurrentPackageFamilyName(ref length, null);
+            StringBuilder name = new StringBuilder(length);
+            return GetCurrentPackageFamilyName(ref length, name) == 0 ? name.ToString() : null;
+        }
 
         private static bool DetectPackaged()
         {

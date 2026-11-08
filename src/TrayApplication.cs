@@ -64,11 +64,23 @@ namespace trutility
         private const string ShellRegBaseFolders = @"Software\Classes\Folder\shell\AddToTrutility";
         private const string ShellCommandFolders = @"Software\Classes\Folder\shell\AddToTrutility\command";
 
+        /// The packaged build's verb is declared in its manifest (shellext\)
+        /// and shows only while this file exists: Explorer cannot see the
+        /// package's own HKCU writes, but it can see its LocalState folder.
+        private static string ShellVerbFlagPath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Packages", PackageInfo.FamilyName, "LocalState", "shell-verb.on");
+
         internal static void RegisterShellVerb()
         {
+            if (PackageInfo.IsPackaged)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(ShellVerbFlagPath));
+                File.WriteAllBytes(ShellVerbFlagPath, new byte[0]);
+                return;
+            }
+
             // The icon comes from the real exe: an execution alias has none.
-            // It goes stale when a package updates, until the next start
-            // registers the verb again.
             string exe = Assembly.GetExecutingAssembly().Location;
             string launch = PackageInfo.LaunchPath;
 
@@ -93,6 +105,19 @@ namespace trutility
 
         internal static void UnregisterShellVerb()
         {
+            if (PackageInfo.IsPackaged)
+            {
+                try
+                {
+                    File.Delete(ShellVerbFlagPath);
+                }
+                catch (Exception ex)
+                {
+                    Diag.Swallowed("removing the shell verb flag", ex);
+                }
+                return;
+            }
+
             DeleteShellKey(ShellRegBaseFiles);
             DeleteShellKey(ShellRegBaseFolders);
         }
@@ -120,6 +145,8 @@ namespace trutility
 
         internal static bool IsShellVerbRegistered()
         {
+            if (PackageInfo.IsPackaged) return File.Exists(ShellVerbFlagPath);
+
             using (RegistryKey k = Registry.CurrentUser.OpenSubKey(ShellRegBaseFiles))
                 return k != null;
         }
