@@ -63,7 +63,12 @@ $source = [System.Drawing.Image]::FromFile((Join-Path $PSScriptRoot "Assets\trut
 $logos = @{ "Square150x150Logo.png" = 150; "Square44x44Logo.png" = 44; "StoreLogo.png" = 50 }
 # Without unplated sizes, Windows draws the icon on an accent-coloured plate in
 # the taskbar, Start's list and Explorer. They are found through resources.pri.
-foreach ($size in 16, 24, 32, 48, 256) { $logos["Square44x44Logo.targetsize-${size}_altform-unplated.png"] = $size }
+# Settings (e.g. Apps > Startup) asks for the plain targetsize form and plates
+# the scale-based fallback, so ship both.
+foreach ($size in 16, 24, 32, 48, 256) {
+    $logos["Square44x44Logo.targetsize-${size}_altform-unplated.png"] = $size
+    $logos["Square44x44Logo.targetsize-${size}.png"] = $size
+}
 try {
     foreach ($logo in $logos.GetEnumerator()) {
         $bitmap = New-Object System.Drawing.Bitmap $logo.Value, $logo.Value
