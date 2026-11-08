@@ -4,6 +4,7 @@ obj/
 Debug/
 Release/
 out/
+packaging/
 
 # Visual Studio / Rider / IDE files
 .vs/
