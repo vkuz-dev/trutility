@@ -515,6 +515,12 @@ namespace trutility
             // opens rather than on every rebuild.
             newMenu.Opening += (s, e) =>
             {
+                Theme.Apply();
+                if (Theme.Active.Font != null && newMenu.Font != Theme.Active.Font)
+                {
+                    newMenu.Font = Theme.Active.Font;
+                }
+                search?.ApplyTheme();
                 search?.Reset();
                 FillIcons(newMenu.Items);
             };
@@ -622,8 +628,29 @@ namespace trutility
             owner?.SuspendLayout();
             try
             {
+                // A menu keeps only 2px above its first row and below its last,
+                // less than beside a highlight, and ignores a Padding set on it.
+                // The end rows make up the rest. They stay the end rows: the
+                // search box is always first, Exit always last, and a submenu
+                // never changes.
+                if (Theme.Active.RowPadding != null && items.Count > 0)
+                {
+                    int extra = Theme.MenuEdge - 2;
+                    ToolStripItem first = items[0];
+                    ToolStripItem last = items[items.Count - 1];
+                    if (first is ToolStripMenuItem) first.Margin = new Padding(0, extra, 0, first.Margin.Bottom);
+                    if (last is ToolStripMenuItem) last.Margin = new Padding(0, last.Margin.Top, 0, extra);
+                }
+
                 foreach (ToolStripItem item in items)
                 {
+                    // Here because this runs for every level just before it shows,
+                    // and for search results as they are added.
+                    if (Theme.Active.RowPadding is Padding row && item is ToolStripMenuItem && item.Padding != row)
+                    {
+                        item.Padding = row;
+                    }
+
                     string filePath = item.Tag as string;
                     if (filePath == null || item.Image != null) continue;
 

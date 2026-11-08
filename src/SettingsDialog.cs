@@ -49,6 +49,7 @@ namespace trutility
         private HotkeyBox _hotkeyBox;
         private ComboBox _cmbHotkeyPosition;
         private bool _hotkeyPositionManaged;
+        private ComboBox _cmbTheme;
         private CheckBox _chkConfirmFiles;
         private CheckBox _chkConfirmFolders;
         private bool _confirmFilesManaged;
@@ -343,6 +344,7 @@ namespace trutility
 
             Control hotkeyRow = BuildHotkeyRow();
             Control positionRow = BuildHotkeyPositionRow();
+            Control themeRow = BuildThemeRow();
 
             _chkEnableSearch.CheckedChanged += (s, e) => UpdateSearchAvailability();
             UpdateSearchAvailability();
@@ -356,7 +358,7 @@ namespace trutility
             };
             stack.Controls.AddRange(new Control[]
             {
-                _chkShell, _chkStartup, _chkDesktop, _chkStartMenu, _chkTrayPin, _chkEnableSearch, _chkFocusSearch, delayRow, hotkeyRow, positionRow,
+                _chkShell, _chkStartup, _chkDesktop, _chkStartMenu, _chkTrayPin, _chkEnableSearch, _chkFocusSearch, delayRow, hotkeyRow, positionRow, themeRow,
             });
             return NewGroup("Settings", stack);
         }
@@ -437,6 +439,48 @@ namespace trutility
                 Margin = Padding.Empty,
             };
             row.Controls.AddRange(new Control[] { _cmbHotkeyPosition, label });
+            return row;
+        }
+
+        private Control BuildThemeRow()
+        {
+            bool managed = NumberSetting.Theme.IsManagedByPolicy();
+
+            // In Theme id order, so an entry's position plus one is the value it stands for.
+            _cmbTheme = new ComboBox
+            {
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                Width = 110,
+                Anchor = AnchorStyles.Left,
+                Enabled = !managed && WindowsVersion.IsWindows11,
+            };
+            _cmbTheme.Items.AddRange(new object[]
+            {
+                "Classic", "Windows 11 Light", "Windows 11 Dark", "System",
+            });
+            // An unknown stored value is Classic, as in Theme.For.
+            int current = NumberSetting.Theme.Value() - 1;
+            _cmbTheme.SelectedIndex = current >= 0 && current < _cmbTheme.Items.Count ? current : 0;
+
+            Label label = new Label
+            {
+                Text = "Menu theme" + (managed ? "   [Managed by Administrator]" : ""),
+                AutoSize = true,
+                Anchor = AnchorStyles.Left,
+            };
+
+            FlowLayoutPanel row = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.LeftToRight,
+                WrapContents = false,
+                Margin = Padding.Empty,
+                // Before Windows 11 the menu is always Classic, so there is nothing to choose.
+                // The box stays disabled there too, so saving never touches the setting.
+                Visible = WindowsVersion.IsWindows11,
+            };
+            row.Controls.AddRange(new Control[] { _cmbTheme, label });
             return row;
         }
 
@@ -948,6 +992,13 @@ namespace trutility
             if (!_hotkeyPositionManaged)
             {
                 NumberSetting.HotkeyMenuPosition.SaveIfChanged(_cmbHotkeyPosition.SelectedIndex);
+            }
+
+            // Rebuilt so the new menu's items start clean: the Windows 11 look
+            // changes their padding, which Classic would otherwise keep.
+            if (_cmbTheme.Enabled && NumberSetting.Theme.SaveIfChanged(_cmbTheme.SelectedIndex + 1))
+            {
+                MenuNeedsRebuild = true;
             }
 
             // Read at the moment of deleting, so no rebuild.

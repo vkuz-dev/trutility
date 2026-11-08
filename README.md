@@ -264,6 +264,7 @@ Administrators can configure settings under `HKLM\SOFTWARE\trutility`.
 |`ConfirmDeleteFolders`|`REG_DWORD`|Controls confirmation before deleting a real folder.|
 |`Hotkey`|`REG_SZ`|Menu hotkey, such as `Ctrl+Alt+S`. Empty means no hotkey.|
 |`HotkeyMenuPosition`|`REG_DWORD`|Position: `0` bottom right, `1` bottom left, `2` top right, `3` top left, `4` mouse cursor.|
+|`Theme`|`REG_DWORD`|Menu look: `1` Classic, `2` Windows 11 light, `3` Windows 11 dark, `4` follow the system's app mode. Defaults to `4` on Windows 11 and Server 2025. Earlier Windows always uses Classic.|
 
 Machine-wide settings apply to users who have not already changed the corresponding setting themselves. If a user has an existing value under `HKCU\SOFTWARE\trutility`, that value takes precedence over the machine-wide setting and the control is not managed. To re-assert a machine-wide value, remove the corresponding value from `HKCU\SOFTWARE\trutility`.
 

@@ -21,6 +21,11 @@ namespace trutility.Settings
         /// Where the hotkey opens the menu, as a MenuPosition value. Bottom right by default.
         public static readonly NumberSetting HotkeyMenuPosition = new NumberSetting("HotkeyMenuPosition", 0);
 
+        /// How the menu looks, as a Theme id: 1 Classic, 2 Windows 11 light,
+        /// 3 Windows 11 dark, 4 follow the system's app mode. Follow system by
+        /// default on Windows 11, Classic before it.
+        public static readonly NumberSetting Theme = new NumberSetting("Theme", trutility.Theme.DefaultId);
+
         private readonly string _valueName;
         private readonly int _default;
 

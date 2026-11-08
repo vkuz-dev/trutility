@@ -133,6 +133,26 @@ namespace trutility
             };
         }
 
+        /// Classic leaves the box as WinForms draws it. A Windows 11 theme was
+        /// chosen through a rebuild, so there is never a Classic box to restore.
+        public void ApplyTheme()
+        {
+            Theme theme = Theme.Active;
+            if (theme.RowPadding == null) return;
+
+            // Borderless, so the renderer can draw a rounded field around it.
+            // A borderless box cannot centre its text, so it is exactly one
+            // line tall and the field's padding is the margin.
+            _box.BorderStyle = BorderStyle.None;
+            _box.BackColor = theme.Input;
+            _box.ForeColor = theme.Text;
+            _box.Height = _box.TextBox.PreferredHeight;
+            int inset = Win11Renderer.InputInset;
+            // In the text column like the entries; the renderer stretches the
+            // field across the row and puts a magnifier in the icon column.
+            _box.Margin = new Padding(Win11Renderer.ContentIndent + 2, inset + 4, inset + 4, inset + 4);
+        }
+
         /// Everything added after the box, up to now, is the tree it swaps out.
         public void CaptureTree()
         {
