@@ -7,10 +7,14 @@
 #include <appmodel.h>
 #include <shlobj.h>
 #include <shobjidl.h>
+#include <shlwapi.h>
 #include <wrl/implements.h>
 #include <wrl/module.h>
 
 #include <string>
+
+#pragma comment(lib, "shlwapi.lib")
+#pragma comment(lib, "runtimeobject.lib")   // WRL's error reporting
 
 using namespace Microsoft::WRL;
 
