@@ -60,8 +60,12 @@ Copy-Item (Join-Path $bin "trutility.exe"), (Join-Path $bin "trutility.exe.confi
 Add-Type -AssemblyName System.Drawing
 $assets = New-Item -ItemType Directory -Force (Join-Path $layout "Assets")
 $source = [System.Drawing.Image]::FromFile((Join-Path $PSScriptRoot "Assets\trutility_1024x1024.png"))
+$logos = @{ "Square150x150Logo.png" = 150; "Square44x44Logo.png" = 44; "StoreLogo.png" = 50 }
+# Without unplated sizes, Windows draws the icon on an accent-coloured plate in
+# the taskbar, Start's list and Explorer. They are found through resources.pri.
+foreach ($size in 16, 24, 32, 48, 256) { $logos["Square44x44Logo.targetsize-${size}_altform-unplated.png"] = $size }
 try {
-    foreach ($logo in @{ "Square150x150Logo.png" = 150; "Square44x44Logo.png" = 44; "StoreLogo.png" = 50 }.GetEnumerator()) {
+    foreach ($logo in $logos.GetEnumerator()) {
         $bitmap = New-Object System.Drawing.Bitmap $logo.Value, $logo.Value
         $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
         $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
@@ -87,6 +91,13 @@ if (-not $makeappx) {
     Write-Host "No Windows SDK found, so no .msix was packed (winget install Microsoft.WindowsSDK.10.0.26100)."
     return
 }
+
+$makepri = Join-Path $makeappx.DirectoryName "makepri.exe"
+$priconfig = Join-Path $out "priconfig.xml"
+& $makepri createconfig /cf $priconfig /dq en-US /pv 10.0.0 /o | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "makepri createconfig failed" }
+& $makepri new /pr $layout /cf $priconfig /of (Join-Path $layout "resources.pri") /o | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "makepri failed" }
 
 $msix = Join-Path $out "trutility_${version}_x64.msix"
 & $makeappx.FullName pack /d $layout /p $msix /o
