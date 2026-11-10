@@ -6,8 +6,8 @@ trutility turns the contents of watched folders into a searchable tray menu. Add
 
 [Features](#features) · [Getting started](#getting-started) · [Usage](#using-the-menu) · [Deployment](#deployment)
 
-- Download from MS Store: ms-windows-store://pdp/?productid=9PKG17Q3K4KW
-- Download from GitHub: https://github.com/vkuz-dev/trutility/releases
+- [Download from MS Store](ms-windows-store://pdp/?productid=9PKG17Q3K4KW)
+- [Download from GitHub](https://github.com/vkuz-dev/trutility/releases)
 
 ---
 
