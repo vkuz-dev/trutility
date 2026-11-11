@@ -16,13 +16,15 @@ namespace trutility.Settings
         /// it into the live NotifyIconSettings entries.
         public static void SaveTrayPin(bool enable)
         {
-            ToggleSetting.PinToTray.SaveIfChanged(enable);
-            ApplyToNotifyIconSettings(enable ? 1 : 0);
+            if (ToggleSetting.PinToTray.SaveIfChanged(enable))
+                ApplyToNotifyIconSettings(enable ? 1 : 0);
         }
 
+        /// Applies the pin only when the setting is explicitly present (HKCU or
+        /// HKLM). Absent, the user's manual pin is left alone.
         public static void ApplyTrayPin()
         {
-            // Always apply the effective state: 1 if pinned, 0 if not
+            if (!ToggleSetting.PinToTray.IsSet()) return;
             ApplyToNotifyIconSettings(ToggleSetting.PinToTray.IsOn() ? 1 : 0);
         }
 
