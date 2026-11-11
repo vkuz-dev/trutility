@@ -179,11 +179,16 @@ namespace trutility
                     "Each subfolder becomes a submenu, and each file or shortcut becomes a menu item.\n\n" +
 
                     "To get started, open Your folder from the General tab and put shortcuts or\n" +
-                    "files in it. Turn on \"Add to trutility\" to add items by right-clicking them in Explorer.\n\n" +
-                    
-                    "Author: Vladimir Kuznetsov",
+                    "files in it. Turn on \"Add to trutility\" to add items by right-clicking them in Explorer.",
                 AutoSize = true,
                 Margin = Padding.Empty,
+            };
+
+            Label author = new Label
+            {
+                Text = "Author: Vladimir Kuznetsov",
+                AutoSize = true,
+                Margin = new Padding(0, 0, 0, 0),
             };
 
             LinkLabel link = new LinkLabel
@@ -194,14 +199,15 @@ namespace trutility
             };
             link.LinkClicked += (s, e) => OpenLink(GitHubUrl);
 
-            FlowLayoutPanel header = new FlowLayoutPanel
+            FlowLayoutPanel authorBlock = new FlowLayoutPanel
             {
                 AutoSize = true,
                 AutoSizeMode = AutoSizeMode.GrowAndShrink,
                 FlowDirection = FlowDirection.TopDown,
                 WrapContents = false,
+                Margin = new Padding(0, 8, 0, 0),
             };
-            header.Controls.AddRange(new Control[] { about, link });
+            authorBlock.Controls.AddRange(new Control[] { author, link });
 
             FlowLayoutPanel row = new FlowLayoutPanel
             {
@@ -210,8 +216,17 @@ namespace trutility
                 FlowDirection = FlowDirection.LeftToRight,
                 WrapContents = false,
             };
-            row.Controls.AddRange(new Control[] { BuildLogo(), header });
-            return row;
+            row.Controls.AddRange(new Control[] { BuildLogo(), about });
+
+            FlowLayoutPanel header = new FlowLayoutPanel
+            {
+                AutoSize = true,
+                AutoSizeMode = AutoSizeMode.GrowAndShrink,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents = false,
+            };
+            header.Controls.AddRange(new Control[] { row, authorBlock });
+            return header;
         }
 
         internal static PictureBox BuildLogo()
