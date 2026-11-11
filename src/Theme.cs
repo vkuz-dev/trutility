@@ -40,7 +40,7 @@ namespace trutility
             Separator = Color.FromArgb(229, 229, 229),
             Border = Color.FromArgb(213, 213, 213),
             Input = Color.White,
-            RowPadding = new Padding(0, 5, Win11Renderer.ContentIndent, 5),
+            RowPadding = new Padding(0, 5, 0, 5),
         };
 
         public static readonly Theme Win11Dark = new Theme
@@ -52,7 +52,7 @@ namespace trutility
             Separator = Color.FromArgb(72, 72, 72),
             Border = Color.FromArgb(69, 69, 69),
             Input = Color.FromArgb(32, 32, 32),
-            RowPadding = new Padding(0, 5, Win11Renderer.ContentIndent, 5),
+            RowPadding = new Padding(0, 5, 0, 5),
         };
 
         public Color Back, Text, Disabled, Hover, Separator, Border, Input;

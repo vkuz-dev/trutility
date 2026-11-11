@@ -21,7 +21,9 @@ namespace trutility
         private const int HighlightRadius = 4;
 
         /// How far icons and text sit in from where WinForms puts them, so they
-        /// clear the rounded highlight. Theme.RowPadding leaves room for it.
+        /// clear the rounded highlight. The menu already leaves room for it on the
+        /// right; padding an item there instead widens it past the menu, which
+        /// pushed submenus 5px off their parent and let the cursor fall through.
         internal const int ContentIndent = 6;
 
         [DllImport("dwmapi.dll")]

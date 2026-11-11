@@ -28,5 +28,20 @@ namespace trutility
             }
             base.OnMouseEnter(e);
         }
+
+        /// <summary>
+        /// WinForms drops its own open-on-hover timer when the cursor goes
+        /// straight from a folder into a folder of the submenu it opened: the
+        /// late mouse-leave from the menu behind cancels it. The folder stayed
+        /// highlighted but needed a click. Hover fires once the cursor rests.
+        /// </summary>
+        protected override void OnMouseHover(EventArgs e)
+        {
+            base.OnMouseHover(e);
+            if (Enabled && Selected && HasDropDownItems && !DropDown.Visible)
+            {
+                ShowDropDown();
+            }
+        }
     }
 }
