@@ -6,7 +6,7 @@ trutility turns the contents of watched folders into a searchable tray menu. Add
 
 [Features](#features) · [Getting started](#getting-started) · [Usage](#using-the-menu) · [Deployment](#deployment)
 
-- [Download from MS Store](ms-windows-store://pdp/?productid=9PKG17Q3K4KW)
+- [Download from MS Store](https://apps.microsoft.com/detail/9PKG17Q3K4KW)
 - [Download from GitHub](https://github.com/vkuz-dev/trutility/releases)
 
 ---
@@ -144,7 +144,7 @@ On a `.lnk` or `.url` shortcut, `$X` implies `$F`. For example, `Finance$X.lnk` 
 |Click or Enter|Launch the item.|
 |**Shift** + (Click or Enter)|Run as Administrator.|
 |**Ctrl** + Click|Remove an entry from your personal folder. It is sent to the Recycle Bin.|
-|Middle-click|Open the containing folder in Explorer|
+|Middle-click|Show the item in Explorer. For a shortcut, show its target instead: the target's folder, or the target itself if it is a file.|
 
 Ctrl+Click is available only for entries in your personal folder. Shared roots will ignore this action.
 

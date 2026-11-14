@@ -739,7 +739,7 @@ namespace trutility
             {
                 if (e.Button == MouseButtons.Middle)
                 {
-                    OpenFileLocation(filePath);
+                    RevealFile(filePath);
                     _menu?.Close();
                     return;
                 }
@@ -801,6 +801,26 @@ namespace trutility
             {
                 MessageBox.Show($"Could not launch:\n{path}\n\n{ex.Message}",
                     "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        /// Middle-click: a shortcut shows where it points, anything else shows itself.
+        private void RevealFile(string path)
+        {
+            RevealKind kind = RevealLib.Plan(path, p => ShortcutLib.TryResolveTarget(p, out string t) ? t : null,
+                                             out string target);
+            switch (kind)
+            {
+                case RevealKind.OpenFolder:
+                    OpenFolder(target);
+                    break;
+                case RevealKind.Select:
+                    OpenFileLocation(target);
+                    break;
+                default:
+                    MessageBox.Show($"The shortcut's target no longer exists:\n{target}",
+                        "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    break;
             }
         }
 
