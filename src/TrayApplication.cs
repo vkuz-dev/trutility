@@ -739,8 +739,11 @@ namespace trutility
             {
                 if (e.Button == MouseButtons.Middle)
                 {
-                    RevealFile(filePath);
+                    // Closed first, and the disk checks run off the UI thread: a
+                    // shortcut into an offline share would otherwise freeze the app
+                    // for the network timeout, with the menu still open.
                     _menu?.Close();
+                    Task.Run(() => RevealFile(filePath));
                     return;
                 }
 
@@ -818,7 +821,7 @@ namespace trutility
                     OpenFileLocation(target);
                     break;
                 default:
-                    MessageBox.Show($"The shortcut's target no longer exists:\n{target}",
+                    MessageBox.Show($"The shortcut's target cannot be found:\n{target}",
                         "trutility", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     break;
             }
